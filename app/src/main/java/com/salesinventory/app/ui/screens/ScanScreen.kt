@@ -139,11 +139,9 @@ fun ScanScreen(
                                                 if (isScanning) {
                                                     isScanning = false
                                                     viewModel.setSaleQuantity(1)
+                                                    viewModel.setLastScannedBarcode(barcode)
                                                     val item = viewModel.inventory.value.find { it.barcode == barcode }
                                                     viewModel.setScanResult(item)
-                                                    if (item == null) {
-                                                        viewModel.processSale(barcode, 0)
-                                                    }
                                                 }
                                             }
                                         )
@@ -289,6 +287,28 @@ fun ScanScreen(
                     }
                 }
             } else {
+                var showAddDialog by remember { mutableStateOf(false) }
+                var scannedBarcode by remember { mutableStateOf("") }
+
+                LaunchedEffect(scanResult) {
+                    if (scanResult == null) {
+                        scannedBarcode = viewModel.lastScannedBarcode.value
+                    }
+                }
+
+                if (showAddDialog) {
+                    AddItemDialog(
+                        initialBarcode = scannedBarcode,
+                        onDismiss = { showAddDialog = false },
+                        onSave = { item ->
+                            viewModel.addInventoryItem(item)
+                            showAddDialog = false
+                            isScanning = true
+                            viewModel.setScanResult(null)
+                        }
+                    )
+                }
+
                 Column(
                     modifier = Modifier.fillMaxSize().padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -303,6 +323,12 @@ fun ScanScreen(
                         viewModel.setScanResult(null)
                     }) {
                         Text("Scan Again")
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { showAddDialog = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add to Inventory")
                     }
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onBack) {
@@ -536,3 +562,5 @@ private fun SaleForm(
         }
     }
 }
+
+

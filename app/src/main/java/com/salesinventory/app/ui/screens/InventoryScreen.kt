@@ -1,9 +1,15 @@
 package com.salesinventory.app.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,13 +26,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.salesinventory.app.data.InventoryItem
+import com.salesinventory.app.scanner.BarcodeAnalyzer
 import com.salesinventory.app.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,18 +52,6 @@ fun InventoryScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var editItem by remember { mutableStateOf<InventoryItem?>(null) }
     var searchQuery by remember { mutableStateOf("") }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) viewModel.importInventoryItems(uri)
-    }
-
-    val folderPickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        if (uri != null) viewModel.setCloudStorageFolder(uri)
-    }
 
     val filteredItems = if (searchQuery.isBlank()) inventory
     else inventory.filter {
@@ -71,18 +71,6 @@ fun InventoryScreen(
                 actions = {
                     IconButton(onClick = { showAddDialog = true }) {
                         Icon(Icons.Filled.Add, contentDescription = "Add Item")
-                    }
-                    IconButton(onClick = { importLauncher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) }) {
-                        Icon(Icons.Filled.FileOpen, contentDescription = "Import Excel")
-                    }
-                    IconButton(onClick = { folderPickerLauncher.launch(null) }) {
-                        Icon(
-                            if (viewModel.isUsingCloudStorage()) Icons.Filled.CloudDone else Icons.Filled.Cloud,
-                            contentDescription = "Cloud Storage"
-                        )
-                    }
-                    IconButton(onClick = { viewModel.loadData() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -235,11 +223,12 @@ private fun InventoryItemCard(
 }
 
 @Composable
-private fun AddItemDialog(
+internal fun AddItemDialog(
     onDismiss: () -> Unit,
-    onSave: (InventoryItem) -> Unit
+    onSave: (InventoryItem) -> Unit,
+    initialBarcode: String = ""
 ) {
-    var barcode by remember { mutableStateOf("") }
+    var barcode by remember { mutableStateOf(initialBarcode) }
     var name by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
@@ -251,6 +240,8 @@ private fun AddItemDialog(
     var minStock by remember { mutableStateOf("") }
     var subLabel by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf("") }
+    var showScanner by remember { mutableStateOf(false) }
+    var isLookingUp by remember { mutableStateOf(false) }
 
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -258,12 +249,39 @@ private fun AddItemDialog(
         if (uri != null) imageUri = uri.toString()
     }
 
+    LaunchedEffect(barcode) {
+        if (barcode.isNotBlank() && name.isBlank() && !isLookingUp) {
+            isLookingUp = true
+            val info = com.salesinventory.app.util.lookupBarcode(barcode)
+            if (info != null) {
+                if (name.isBlank()) name = info.name
+                if (category.isBlank()) category = info.category
+                if (imageUri.isBlank() && info.imageUrl.isNotBlank()) imageUri = info.imageUrl
+            }
+            isLookingUp = false
+        }
+    }
+
+    if (showScanner) {
+        ScanBarcodeDialog(
+            onBarcodeScanned = { scanned -> barcode = scanned; showScanner = false },
+            onDismiss = { showScanner = false }
+        )
+    }
+
+
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Inventory Item") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value = barcode, onValueChange = { barcode = it }, label = { Text("Barcode *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(value = barcode, onValueChange = { barcode = it }, label = { Text("Barcode *") }, singleLine = true, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { showScanner = true }) {
+                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scan Barcode")
+                    }
+                }
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Product Name *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = size, onValueChange = { size = it }, label = { Text("Size") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("M, XL, 42") })
@@ -333,6 +351,8 @@ private fun EditItemDialog(
     var minStock by remember { mutableStateOf(item.minStock.toString()) }
     var subLabel by remember { mutableStateOf(item.subLabel) }
     var imageUri by remember { mutableStateOf(item.imageUri) }
+    var showScanner by remember { mutableStateOf(false) }
+    val initialBarcode = remember { item.barcode }
 
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -340,12 +360,35 @@ private fun EditItemDialog(
         if (uri != null) imageUri = uri.toString()
     }
 
+    LaunchedEffect(barcode) {
+        if (barcode.isNotBlank() && barcode != initialBarcode) {
+            val info = com.salesinventory.app.util.lookupBarcode(barcode)
+            if (info != null) {
+                if (name.isBlank()) name = info.name
+                if (category.isBlank()) category = info.category
+                if (imageUri.isBlank() && info.imageUrl.isNotBlank()) imageUri = info.imageUrl
+            }
+        }
+    }
+
+    if (showScanner) {
+        ScanBarcodeDialog(
+            onBarcodeScanned = { scanned -> barcode = scanned; showScanner = false },
+            onDismiss = { showScanner = false }
+        )
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Edit Item") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value = barcode, onValueChange = { barcode = it }, label = { Text("Barcode *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(value = barcode, onValueChange = { barcode = it }, label = { Text("Barcode *") }, singleLine = true, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { showScanner = true }) {
+                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scan Barcode")
+                    }
+                }
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Product Name *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = size, onValueChange = { size = it }, label = { Text("Size") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("M, XL, 42") })
@@ -395,4 +438,104 @@ private fun EditItemDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
+}
+
+@Composable
+private fun ScanBarcodeDialog(
+    onBarcodeScanned: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var hasPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasPermission = granted }
+
+    LaunchedEffect(Unit) {
+        if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraProvider?.unbindAll()
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (hasPermission) {
+                    AndroidView(
+                        factory = { ctx ->
+                            PreviewView(ctx).also { previewView ->
+                                val future = ProcessCameraProvider.getInstance(ctx)
+                                future.addListener({
+                                    val provider = future.get()
+                                    cameraProvider = provider
+                                    val preview = Preview.Builder().build().also {
+                                        it.setSurfaceProvider(previewView.surfaceProvider)
+                                    }
+                                    val analysis = ImageAnalysis.Builder()
+                                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                        .build()
+                                    var done = false
+                                    analysis.setAnalyzer(
+                                        ContextCompat.getMainExecutor(ctx),
+                                        BarcodeAnalyzer { barcode ->
+                                            if (!done) { done = true; onBarcodeScanned(barcode) }
+                                        }
+                                    )
+                                    provider.unbindAll()
+                                    provider.bindToLifecycle(
+                                        lifecycleOwner,
+                                        CameraSelector.DEFAULT_BACK_CAMERA,
+                                        preview, analysis
+                                    )
+                                }, ContextCompat.getMainExecutor(ctx))
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.height(16.dp))
+                        Text("Camera permission required", color = MaterialTheme.colorScheme.onSurface)
+                        Spacer(Modifier.height(16.dp))
+                        Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                            Text("Grant Permission")
+                        }
+                    }
+                }
+
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
+                }
+
+                Text(
+                    "Point camera at barcode",
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp)
+                )
+            }
+        }
+    }
 }

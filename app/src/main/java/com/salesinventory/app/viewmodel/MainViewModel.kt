@@ -17,6 +17,7 @@ import java.util.*
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val appStorage = AppStorage(application)
     private val excelManager = ExcelManager(application)
     private val settingsManager = ReportSettingsManager(application)
 
@@ -50,6 +51,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    private val _lastScannedBarcode = MutableStateFlow("")
+    val lastScannedBarcode: StateFlow<String> = _lastScannedBarcode.asStateFlow()
+
     private val _todaySalesTotal = MutableStateFlow(0.0)
     val todaySalesTotal: StateFlow<Double> = _todaySalesTotal.asStateFlow()
 
@@ -66,12 +70,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loadData() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.initializeFileIfNeeded()
-                _inventory.value = excelManager.getAllInventory()
-                _sales.value = excelManager.getAllSales()
-                _discounts.value = excelManager.getDiscounts()
-                _customers.value = excelManager.getAllCustomers()
-                _suppliers.value = excelManager.getAllSuppliers()
+                if (!excelManager.hasMigrated()) {
+                    excelManager.importExcelToJson(appStorage)
+                }
+                _inventory.value = appStorage.getAllInventory()
+                _sales.value = appStorage.getAllSales()
+                _discounts.value = appStorage.getDiscounts()
+                _customers.value = appStorage.getAllCustomers()
+                _suppliers.value = appStorage.getAllSuppliers()
                 _currentDiscount.value = _discounts.value.find { it.isActive }
                 updateStats()
                 computeComparison()
@@ -82,11 +88,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateStats() {
-        val todaySales = excelManager.getTodaySales()
+        val todaySales = getTodaySales()
         _todaySalesTotal.value = todaySales.sumOf { it.total }
         _todayProfit.value = todaySales.sumOf { it.profit }
         val threshold = settingsManager.load().minStockThreshold
         _lowStockItems.value = _inventory.value.filter { it.stock <= threshold }
+    }
+
+    private fun getTodaySales(): List<SaleRecord> {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        return _sales.value.filter { it.date.startsWith(today) }
     }
 
     fun setScanResult(item: InventoryItem?) {
@@ -99,6 +110,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _saleQuantity.value = if (qty < 1) 1 else qty
     }
 
+    fun setLastScannedBarcode(barcode: String) {
+        _lastScannedBarcode.value = barcode
+    }
+
     fun setCurrentDiscount(discount: Discount?) {
         _currentDiscount.value = discount
     }
@@ -106,7 +121,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun processSale(barcode: String, quantity: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val item = excelManager.getItemByBarcode(barcode)
+                val item = appStorage.getItemByBarcode(barcode)
                 if (item == null) {
                     _error.value = "Item not found: $barcode"
                     return@launch
@@ -142,10 +157,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     total = total
                 )
 
-                excelManager.recordSale(sale)
-                excelManager.updateStock(barcode, item.stock - quantity)
-                _sales.value = excelManager.getAllSales()
-                _inventory.value = excelManager.getAllInventory()
+                appStorage.recordSale(sale)
+                appStorage.updateStock(barcode, item.stock - quantity)
+                _sales.value = appStorage.getAllSales()
+                _inventory.value = appStorage.getAllInventory()
                 _saleComplete.value = true
                 updateStats()
             } catch (e: Exception) {
@@ -155,13 +170,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addInventoryItem(item: InventoryItem) {
+        val current = _inventory.value.toMutableList()
+        val idx = current.indexOfFirst { it.barcode == item.barcode }
+        if (idx >= 0) current[idx] = item else current.add(item)
+        _inventory.value = current
+        updateStats()
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.addOrUpdateInventory(item)
-                _inventory.value = excelManager.getAllInventory()
-                updateStats()
+                appStorage.addOrUpdateInventory(item)
             } catch (e: Exception) {
-                _error.value = "Error adding item: ${e.message}"
+                _error.value = "Error saving item: ${e.message}"
             }
         }
     }
@@ -170,7 +188,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val count = excelManager.importInventoryFromUri(uri)
-                _inventory.value = excelManager.getAllInventory()
+                _inventory.value = appStorage.getAllInventory()
                 updateStats()
                 if (count > 0) _error.value = "Imported $count items successfully"
                 else _error.value = "No items found to import"
@@ -181,11 +199,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun removeInventoryItem(barcode: String) {
+        val current = _inventory.value.toMutableList()
+        current.removeAll { it.barcode == barcode }
+        _inventory.value = current
+        updateStats()
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.removeInventoryItem(barcode)
-                _inventory.value = excelManager.getAllInventory()
-                updateStats()
+                appStorage.removeInventoryItem(barcode)
             } catch (e: Exception) {
                 _error.value = "Error removing item: ${e.message}"
             }
@@ -195,8 +215,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addDiscount(discount: Discount) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.addOrUpdateDiscount(discount)
-                _discounts.value = excelManager.getDiscounts()
+                appStorage.addOrUpdateDiscount(discount)
+                _discounts.value = appStorage.getDiscounts()
                 _currentDiscount.value = _discounts.value.find { it.isActive }
             } catch (e: Exception) {
                 _error.value = "Error adding discount: ${e.message}"
@@ -207,8 +227,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removeDiscount(id: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.removeDiscount(id)
-                _discounts.value = excelManager.getDiscounts()
+                appStorage.removeDiscount(id)
+                _discounts.value = appStorage.getDiscounts()
                 _currentDiscount.value = _discounts.value.find { it.isActive }
             } catch (e: Exception) {
                 _error.value = "Error removing discount: ${e.message}"
@@ -309,7 +329,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val transactionId = UUID.randomUUID().toString().take(8)
                 val discount = _currentDiscount.value
                 for (cart in items) {
-                    val item = excelManager.getItemByBarcode(cart.barcode)
+                    val item = appStorage.getItemByBarcode(cart.barcode)
                     if (item == null) { _error.value = "Item not found: ${cart.barcode}"; return@launch }
                     if (item.stock < cart.quantity) { _error.value = "Insufficient stock for ${item.name}"; return@launch }
 
@@ -341,15 +361,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isCredit = isCredit,
                         transactionId = transactionId
                     )
-                    excelManager.recordSale(sale)
-                    excelManager.updateStock(cart.barcode, item.stock - cart.quantity)
+                    appStorage.recordSale(sale)
+                    appStorage.updateStock(cart.barcode, item.stock - cart.quantity)
                 }
-                _sales.value = excelManager.getAllSales()
-                _inventory.value = excelManager.getAllInventory()
+                _sales.value = appStorage.getAllSales()
+                _inventory.value = appStorage.getAllInventory()
                 updateStats()
                 if (isCredit && customerId.isNotBlank()) {
                     val saleTotal = items.sumOf { cart ->
-                        val i = excelManager.getItemByBarcode(cart.barcode)
+                        val i = appStorage.getItemByBarcode(cart.barcode)
                         if (i != null) {
                             val sub = i.price * cart.quantity
                             val dAmt = if (discount != null && discount.isActive) {
@@ -361,15 +381,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             sub - dAmt
                         } else 0.0
                     }
-                    val customer = excelManager.getCustomerById(customerId)
+                    val customer = appStorage.getCustomerById(customerId)
                     if (customer != null) {
-                        excelManager.addOrUpdateCustomer(
+                        appStorage.addOrUpdateCustomer(
                             customer.copy(
                                 creditBalance = customer.creditBalance + saleTotal,
                                 totalPurchases = customer.totalPurchases + saleTotal
                             )
                         )
-                        _customers.value = excelManager.getAllCustomers()
+                        _customers.value = appStorage.getAllCustomers()
                     }
                 }
                 _error.value = "Sale completed! Transaction: $transactionId"
@@ -382,8 +402,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addOrUpdateCustomer(customer: Customer) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.addOrUpdateCustomer(customer)
-                _customers.value = excelManager.getAllCustomers()
+                appStorage.addOrUpdateCustomer(customer)
+                _customers.value = appStorage.getAllCustomers()
             } catch (e: Exception) {
                 _error.value = "Error saving customer: ${e.message}"
             }
@@ -393,8 +413,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removeCustomer(id: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.removeCustomer(id)
-                _customers.value = excelManager.getAllCustomers()
+                appStorage.removeCustomer(id)
+                _customers.value = appStorage.getAllCustomers()
             } catch (e: Exception) {
                 _error.value = "Error removing customer: ${e.message}"
             }
@@ -404,8 +424,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addOrUpdateSupplier(supplier: Supplier) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.addOrUpdateSupplier(supplier)
-                _suppliers.value = excelManager.getAllSuppliers()
+                appStorage.addOrUpdateSupplier(supplier)
+                _suppliers.value = appStorage.getAllSuppliers()
             } catch (e: Exception) {
                 _error.value = "Error saving supplier: ${e.message}"
             }
@@ -415,8 +435,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removeSupplier(id: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.removeSupplier(id)
-                _suppliers.value = excelManager.getAllSuppliers()
+                appStorage.removeSupplier(id)
+                _suppliers.value = appStorage.getAllSuppliers()
             } catch (e: Exception) {
                 _error.value = "Error removing supplier: ${e.message}"
             }
@@ -426,8 +446,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun recordCreditPayment(payment: CreditPayment) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                excelManager.recordCreditPayment(payment)
-                _customers.value = excelManager.getAllCustomers()
+                appStorage.recordCreditPayment(payment)
+                _customers.value = appStorage.getAllCustomers()
             } catch (e: Exception) {
                 _error.value = "Error recording payment: ${e.message}"
             }
@@ -435,7 +455,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getCustomerPayments(customerId: String): List<CreditPayment> {
-        return excelManager.getPaymentsByCustomer(customerId)
+        return appStorage.getPaymentsByCustomer(customerId)
     }
 
     // ----- PDF EXPORT -----
@@ -463,7 +483,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             PdfExporter.generateSalesReport(
                 context, settings.storeName,
-                "Sales Report (${dateFormat.format(java.util.Date())})",
+                "Sales History (${dateFormat.format(java.util.Date())})",
                 headers, rows, summary
             )
         } catch (e: Exception) {
@@ -500,7 +520,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun printBarcodeLabel(barcode: String, address: String, callback: (Boolean) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val item = excelManager.getItemByBarcode(barcode)
+                val item = appStorage.getItemByBarcode(barcode)
                 if (item == null) { callback(false); return@launch }
                 val connected = BluetoothPrinter.connect(address)
                 if (!connected) { callback(false); return@launch }
@@ -514,47 +534,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getBluetoothPrinters(): List<Pair<String, String>> {
-        return com.salesinventory.app.util.BluetoothPrinter.getPairedPrinters()
+        return BluetoothPrinter.getPairedPrinters()
     }
 
     // ----- BACKUP -----
 
-    fun backupToCloud() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                excelManager.syncToCloud()
-                _error.value = "Backup completed successfully"
-            } catch (e: Exception) {
-                _error.value = "Backup failed: ${e.message}"
-            }
-        }
-    }
-
     fun clearError() {
         _error.value = null
     }
-
-    fun getExcelManager(): ExcelManager = excelManager
-
-    fun setCloudStorageFolder(uri: android.net.Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                excelManager.setStorageFolder(uri)
-                loadData()
-                _error.value = "Linked to cloud storage successfully"
-            } catch (e: Exception) {
-                _error.value = "Error linking cloud storage: ${e.message}"
-            }
-        }
-    }
-
-    fun removeCloudStorage() {
-        viewModelScope.launch(Dispatchers.IO) {
-            excelManager.clearStorageFolder()
-            loadData()
-            _error.value = "Using local storage only"
-        }
-    }
-
-    fun isUsingCloudStorage(): Boolean = excelManager.isUsingCloudStorage()
 }

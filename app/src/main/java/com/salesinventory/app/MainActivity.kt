@@ -57,7 +57,7 @@ fun SalesInventoryApp() {
         BottomNavItem(Screen.Home, Icons.Filled.Home, "Home"),
         BottomNavItem(Screen.Scan, Icons.Filled.QrCodeScanner, "Scan"),
         BottomNavItem(Screen.Inventory, Icons.Filled.Inventory2, "Inventory"),
-        BottomNavItem(Screen.SalesReport, Icons.Filled.Assessment, "Reports"),
+        BottomNavItem(Screen.SalesReport, Icons.Filled.Assessment, "Sales"),
         BottomNavItem(Screen.Discount, Icons.Filled.LocalOffer, "Discounts")
     )
 

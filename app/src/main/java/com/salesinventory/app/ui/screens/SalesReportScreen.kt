@@ -74,7 +74,7 @@ fun SalesReportScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sales Report") },
+                title = { Text("Sales History") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -155,7 +155,7 @@ fun SalesReportScreen(
             if (filteredSales.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Filled.List, contentDescription = "Reports", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Filled.List, contentDescription = "Sales", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(16.dp))
                         Text("No sales records", style = MaterialTheme.typography.titleMedium)
                         Text("Start scanning items to record sales", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -197,9 +197,9 @@ fun SalesReportScreen(
                                 val intent = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/plain"
                                     putExtra(Intent.EXTRA_TEXT, shareText)
-                                    putExtra(Intent.EXTRA_SUBJECT, "Sales Report")
+                                    putExtra(Intent.EXTRA_SUBJECT, "Sales History")
                                 }
-                                context.startActivity(Intent.createChooser(intent, "Share Sales Report"))
+                                context.startActivity(Intent.createChooser(intent, "Share Sales History"))
                                 showShareDialog = false
                             }) {
                                 Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))

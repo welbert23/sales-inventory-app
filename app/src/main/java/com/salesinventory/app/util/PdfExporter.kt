@@ -37,7 +37,7 @@ object PdfExporter {
         val columnWidth = 80f
 
         paintBold.textSize = 18f
-        canvas.drawText(storeName.ifBlank { "Sales Report" }, leftMargin, y, paintBold)
+        canvas.drawText(storeName.ifBlank { "Sales History" }, leftMargin, y, paintBold)
 
         y += 24f
         paint.textSize = 12f

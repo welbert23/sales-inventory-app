@@ -139,7 +139,7 @@ fun HomeScreen(
             ) {
                 Icon(Icons.Filled.List, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("View Sales Report")
+                Text("View Sales History")
             }
 
             OutlinedButton(
@@ -176,15 +176,6 @@ fun HomeScreen(
                 Icon(Icons.Filled.Business, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Manage Suppliers")
-            }
-
-            OutlinedButton(
-                onClick = { viewModel.backupToCloud() },
-                modifier = Modifier.fillMaxWidth().height(48.dp)
-            ) {
-                Icon(Icons.Filled.CloudUpload, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Backup to Cloud")
             }
 
             if (lowStockItems.isNotEmpty()) {
