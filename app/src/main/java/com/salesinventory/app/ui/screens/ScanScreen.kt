@@ -2,6 +2,7 @@ package com.salesinventory.app.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -11,6 +12,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,7 +38,10 @@ import com.salesinventory.app.data.InventoryItem
 import com.salesinventory.app.data.PaymentType
 import com.salesinventory.app.scanner.BarcodeAnalyzer
 import com.salesinventory.app.ui.theme.*
+import com.salesinventory.app.util.BarcodeProductInfo
+import com.salesinventory.app.util.lookupBarcode
 import com.salesinventory.app.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +63,14 @@ fun ScanScreen(
     var cameraError by remember { mutableStateOf(false) }
     var currentItem by remember { mutableStateOf<InventoryItem?>(null) }
     var saleQty by remember { mutableStateOf(1) }
+    var missingBarcode by remember { mutableStateOf("") }
+    var lookupResult by remember { mutableStateOf<BarcodeProductInfo?>(null) }
+    var lookupLoading by remember { mutableStateOf(false) }
+    var showAddFromLookup by remember { mutableStateOf(false) }
+    var lookupName by remember { mutableStateOf("") }
+    var lookupCategory by remember { mutableStateOf("") }
+    var lookupPrice by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -80,9 +94,13 @@ fun ScanScreen(
         val item = inventory.find { it.barcode == barcode }
         if (item == null) {
             currentItem = null
+            missingBarcode = barcode
+            lookupResult = null
             isScanning = true
             return
         }
+        missingBarcode = ""
+        lookupResult = null
         saleQty = 1
         currentItem = item
     }
@@ -284,6 +302,47 @@ fun ScanScreen(
                         saleQty = 1
                     }
                 )
+            } else if (lookupLoading) {
+                Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(16.dp))
+                    Text("Looking up barcode online...", fontSize = 16.sp)
+                }
+            } else if (lookupResult != null) {
+                Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(56.dp), tint = Green700)
+                    Spacer(Modifier.height(12.dp))
+                    Text("Product Found Online", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Spacer(Modifier.height(16.dp))
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Blue50)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(lookupResult!!.name.ifBlank { "Unknown Product" }, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            if (lookupResult!!.brand.isNotBlank()) {
+                                Spacer(Modifier.height(4.dp))
+                                Text("Brand: ${lookupResult!!.brand}", fontSize = 13.sp, color = Grey600)
+                            }
+                            if (lookupResult!!.category.isNotBlank()) {
+                                Spacer(Modifier.height(4.dp))
+                                Text("Category: ${lookupResult!!.category}", fontSize = 13.sp, color = Grey600)
+                            }
+                            Text("Barcode: $missingBarcode", fontSize = 12.sp, color = Grey600)
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                    Button(onClick = { showAddFromLookup = true }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(10.dp)) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add to Inventory")
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { missingBarcode = ""; lookupResult = null; isScanning = true }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(10.dp)) {
+                        Text("Scan Again")
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(onClick = onBack) {
+                        Text("Go Back")
+                    }
+                }
             } else if (cameraError) {
                 Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Filled.VideocamOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
@@ -296,16 +355,39 @@ fun ScanScreen(
                         Text("Retry Camera")
                     }
                 }
-            } else {
-                Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            } else if (missingBarcode.isNotBlank()) {
+                Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(64.dp))
                     Spacer(Modifier.height(16.dp))
                     Text("Item not found in inventory", fontSize = 18.sp)
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { isScanning = true; currentItem = null }) {
-                        Text("Scan Again")
+                    Spacer(Modifier.height(4.dp))
+                    Text("Barcode: $missingBarcode", fontSize = 13.sp, color = Grey600)
+                    Spacer(Modifier.height(20.dp))
+                    Button(
+                        onClick = {
+                            lookupLoading = true
+                            scope.launch {
+                                lookupResult = lookupBarcode(missingBarcode)
+                                lookupLoading = false
+                                if (lookupResult == null) {
+                                    Toast.makeText(context, "No product info found online", Toast.LENGTH_SHORT).show()
+                                    missingBarcode = ""
+                                    isScanning = true
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Filled.Language, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Lookup Online")
                     }
                     Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { missingBarcode = ""; isScanning = true }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(10.dp)) {
+                        Text("Scan Again")
+                    }
+                    Spacer(Modifier.height(4.dp))
                     TextButton(onClick = onBack) {
                         Text("Go Back")
                     }
@@ -334,6 +416,54 @@ fun ScanScreen(
                 isScanning = false
                 saleQty = 1
                 currentItem = item
+            }
+        )
+    }
+
+    if (showAddFromLookup && lookupResult != null) {
+        val info = lookupResult!!
+        LaunchedEffect(info) {
+            lookupName = info.name
+            lookupCategory = info.category
+            lookupPrice = ""
+        }
+        AlertDialog(
+            onDismissRequest = { showAddFromLookup = false },
+            title = { Text("Add to Inventory", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = lookupName, onValueChange = { lookupName = it }, label = { Text("Product Name") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = lookupCategory, onValueChange = { lookupCategory = it }, label = { Text("Category") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(value = lookupPrice, onValueChange = { lookupPrice = it }, label = { Text("Selling Price") }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                    Text("Barcode: $missingBarcode", fontSize = 12.sp, color = Grey600)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val price = lookupPrice.toDoubleOrNull() ?: 0.0
+                    if (lookupName.isBlank() || price <= 0.0) return@TextButton
+                    viewModel.addInventoryItem(
+                        InventoryItem(
+                            barcode = missingBarcode,
+                            name = lookupName.trim(),
+                            category = lookupCategory.trim(),
+                            price = price,
+                            stock = 1,
+                            unit = "pcs",
+                            minStock = 1
+                        )
+                    )
+                    showAddFromLookup = false
+                    missingBarcode = ""
+                    lookupResult = null
+                    isScanning = true
+                    Toast.makeText(context, "Item added to inventory", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Add Item")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddFromLookup = false }) { Text("Cancel") }
             }
         )
     }
