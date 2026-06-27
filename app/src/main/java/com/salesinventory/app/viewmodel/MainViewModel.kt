@@ -323,7 +323,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun processBulkSale(items: List<CartItem>, customerId: String = "", paymentType: PaymentType = PaymentType.CASH, isCredit: Boolean = false) {
+    fun processBulkSale(items: List<CartItem>, customerId: String = "", customerType: String = "", paymentType: PaymentType = PaymentType.CASH, isCredit: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val transactionId = UUID.randomUUID().toString().take(8)
@@ -357,6 +357,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         subtotal = subtotal,
                         total = total,
                         customerId = customerId,
+                        customerType = customerType,
                         paymentType = paymentType,
                         isCredit = isCredit,
                         transactionId = transactionId

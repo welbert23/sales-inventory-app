@@ -3,17 +3,20 @@ package com.salesinventory.app.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.salesinventory.app.data.Discount
 import com.salesinventory.app.data.DiscountType
+import com.salesinventory.app.ui.theme.*
 import com.salesinventory.app.viewmodel.MainViewModel
 import java.util.*
 
@@ -30,7 +33,7 @@ fun DiscountScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Promotions & Discounts") },
+                title = { Text("Promotions & Discounts", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -42,10 +45,10 @@ fun DiscountScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = Blue800,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White
                 ),
                 windowInsets = WindowInsets(0, 0, 0, 0)
             )
@@ -55,25 +58,27 @@ fun DiscountScreen(
             if (currentDiscount != null) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFFFFF3E0))
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Amber50)
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.LocalOffer, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFFF57F17))
+                        Icon(Icons.Filled.LocalOffer, contentDescription = null, tint = Amber700)
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Active Discount: ${currentDiscount!!.name}", fontWeight = FontWeight.Bold)
+                            Text("Active: ${currentDiscount!!.name}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             val desc = if (currentDiscount!!.type == DiscountType.PERCENTAGE)
                                 "${currentDiscount!!.value}% OFF" else "PHP ${currentDiscount!!.value} OFF"
-                            Text(desc, color = androidx.compose.ui.graphics.Color(0xFFF57F17))
+                            Text(desc, color = Amber700, fontSize = 13.sp)
                         }
                         Button(
                             onClick = { viewModel.setCurrentDiscount(null) },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                            colors = ButtonDefaults.buttonColors(containerColor = Red700),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Remove")
+                            Text("Remove", fontSize = 12.sp)
                         }
                     }
                 }
@@ -82,13 +87,16 @@ fun DiscountScreen(
             if (discounts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Filled.Star, contentDescription = "Discounts", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Filled.Star, contentDescription = "Discounts", modifier = Modifier.size(64.dp), tint = Grey400)
                         Spacer(Modifier.height(16.dp))
                         Text("No discounts configured", style = MaterialTheme.typography.titleMedium)
-                        Text("Add discounts for monthly promotions", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Add discounts for monthly promotions", color = Grey600)
                         Spacer(Modifier.height(16.dp))
-                        Button(onClick = { showAddDialog = true }) {
-                            Icon(Icons.Filled.Add, contentDescription = null)
+                        Button(
+                            onClick = { showAddDialog = true },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Add Discount")
                         }
@@ -133,39 +141,42 @@ private fun DiscountCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(if (isActive) 2.dp else 0.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isActive) androidx.compose.ui.graphics.Color(0xFFFFF3E0)
-            else MaterialTheme.colorScheme.surface
+            containerColor = if (isActive) Amber50 else Color.White
         )
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 Icons.Filled.LocalOffer,
                 contentDescription = null,
-                tint = if (isActive) androidx.compose.ui.graphics.Color(0xFFF57F17) else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (isActive) Amber700 else Grey600,
+                modifier = Modifier.size(28.dp)
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(discount.name, fontWeight = FontWeight.Bold)
+                Text(discount.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 val valStr = if (discount.type == DiscountType.PERCENTAGE)
                     "${discount.value}% OFF" else "PHP ${discount.value} OFF"
                 Text(
                     valStr,
-                    color = if (isActive) androidx.compose.ui.graphics.Color(0xFFF57F17) else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isActive) Amber700 else Grey600,
+                    fontSize = 13.sp
                 )
             }
             if (!isActive) {
                 TextButton(onClick = onActivate) {
-                    Text("Activate")
+                    Text("Activate", color = Blue800)
                 }
             } else {
-                Text("Active", fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color(0xFF2E7D32))
+                Text("Active", fontWeight = FontWeight.Bold, color = Green700, fontSize = 12.sp)
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Red700)
             }
         }
     }
@@ -184,7 +195,7 @@ private fun AddDiscountDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Discount") },
+        title = { Text("New Discount", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
@@ -193,7 +204,8 @@ private fun AddDiscountDialog(
                     label = { Text("Discount Name *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("e.g. Valentine Promo") }
+                    placeholder = { Text("e.g. Valentine Promo") },
+                    shape = RoundedCornerShape(10.dp)
                 )
 
                 Text("Discount Type:", style = MaterialTheme.typography.bodyMedium)
@@ -213,7 +225,8 @@ private fun AddDiscountDialog(
                     label = { Text(if (typeIndex == 0) "Percentage (%) *" else "Amount (PHP) *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    prefix = { Text(if (typeIndex == 0) "%" else "PHP ") }
+                    prefix = { Text(if (typeIndex == 0) "%" else "PHP ") },
+                    shape = RoundedCornerShape(10.dp)
                 )
             }
         },
@@ -232,7 +245,8 @@ private fun AddDiscountDialog(
                         onSave(discount)
                     }
                 },
-                enabled = name.isNotBlank() && (value.toDoubleOrNull() ?: 0.0) > 0
+                enabled = name.isNotBlank() && (value.toDoubleOrNull() ?: 0.0) > 0,
+                shape = RoundedCornerShape(10.dp)
             ) {
                 Text("Save")
             }

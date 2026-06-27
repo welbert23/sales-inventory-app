@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.salesinventory.app.data.CreditPayment
 import com.salesinventory.app.data.Customer
+import com.salesinventory.app.ui.theme.*
 import com.salesinventory.app.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -39,7 +40,7 @@ fun CustomerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Customers") },
+                title = { Text("Customers", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -51,9 +52,10 @@ fun CustomerScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = Blue800,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White
                 ),
                 windowInsets = WindowInsets(0, 0, 0, 0)
             )
@@ -65,11 +67,14 @@ fun CustomerScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.People, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Filled.People, contentDescription = null, modifier = Modifier.size(64.dp), tint = Grey400)
                     Spacer(Modifier.height(8.dp))
-                    Text("No customers yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("No customers yet", color = Grey600)
                     Spacer(Modifier.height(8.dp))
-                    Button(onClick = { editingCustomer = null; showAddDialog = true }) {
+                    Button(
+                        onClick = { editingCustomer = null; showAddDialog = true },
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
                         Text("Add Customer")
                     }
                 }
@@ -83,32 +88,35 @@ fun CustomerScreen(
                 items(customers, key = { it.id }) { customer ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = CardDefaults.cardElevation(1.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (customer.creditBalance > 0) Color(0xFFFFF3E0) else MaterialTheme.colorScheme.surface
+                            containerColor = if (customer.creditBalance > 0) Amber50 else Color.White
                         )
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(14.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(customer.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text(customer.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                     if (customer.phone.isNotBlank()) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Filled.Phone, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Icon(Icons.Filled.Phone, contentDescription = null, modifier = Modifier.size(14.dp), tint = Grey600)
                                             Spacer(Modifier.width(4.dp))
-                                            Text(customer.phone, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(customer.phone, fontSize = 13.sp, color = Grey600)
                                         }
                                     }
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("Balance:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(customer.customerType, fontSize = 11.sp, color = if (customer.customerType == "Online") Blue800 else Green700)
+                                    Text("Balance:", fontSize = 11.sp, color = Grey600)
                                     Text(
                                         "PHP ${"%.2f".format(customer.creditBalance)}",
                                         fontWeight = FontWeight.Bold,
-                                        color = if (customer.creditBalance > 0) Color(0xFFF57F17) else Color(0xFF2E7D32)
+                                        color = if (customer.creditBalance > 0) Amber700 else Green700
                                     )
                                 }
                             }
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(6.dp))
                             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                                 TextButton(onClick = { showPaymentHistory = customer }) {
                                     Icon(Icons.Filled.History, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -184,6 +192,7 @@ fun CustomerScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomerDialog(
     customer: Customer?,
@@ -195,25 +204,39 @@ private fun CustomerDialog(
     var phone by remember { mutableStateOf(customer?.phone ?: "") }
     var email by remember { mutableStateOf(customer?.email ?: "") }
     var address by remember { mutableStateOf(customer?.address ?: "") }
+    var customerType by remember { mutableStateOf(customer?.customerType ?: "Walk-in") }
     var notes by remember { mutableStateOf(customer?.notes ?: "") }
+    var showTypeDropdown by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (customer == null) "Add Customer" else "Edit Customer", fontWeight = FontWeight.Bold) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Phone") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Phone") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                ExposedDropdownMenuBox(expanded = showTypeDropdown, onExpandedChange = { showTypeDropdown = it }) {
+                    OutlinedTextField(
+                        value = customerType, onValueChange = {}, readOnly = true,
+                        label = { Text("Type") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showTypeDropdown) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(), singleLine = true, shape = RoundedCornerShape(10.dp)
+                    )
+                    ExposedDropdownMenu(expanded = showTypeDropdown, onDismissRequest = { showTypeDropdown = false }) {
+                        listOf("Walk-in", "Online").forEach { type ->
+                            DropdownMenuItem(text = { Text(type) }, onClick = { customerType = type; showTypeDropdown = false })
+                        }
+                    }
+                }
+                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
             }
         },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (onDelete != null) {
                     TextButton(onClick = onDelete) {
-                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                        Text("Delete", color = Red700)
                     }
                 }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -227,6 +250,7 @@ private fun CustomerDialog(
                                     phone = phone,
                                     email = email,
                                     address = address,
+                                    customerType = customerType,
                                     creditBalance = customer?.creditBalance ?: 0.0,
                                     totalPurchases = customer?.totalPurchases ?: 0.0,
                                     notes = notes
@@ -234,7 +258,8 @@ private fun CustomerDialog(
                             )
                         }
                     },
-                    enabled = name.isNotBlank()
+                    enabled = name.isNotBlank(),
+                    shape = RoundedCornerShape(10.dp)
                 ) { Text("Save") }
             }
         }
@@ -252,23 +277,26 @@ private fun PaymentDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Record Payment - ${customer.name}", fontWeight = FontWeight.Bold) },
+        title = { Text("Record Payment", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Current Balance: PHP ${"%.2f".format(customer.creditBalance)}", color = if (customer.creditBalance > 0) Color(0xFFF57F17) else Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                Text("Customer: ${customer.name}", fontWeight = FontWeight.Medium)
+                Text("Current Balance: PHP ${"%.2f".format(customer.creditBalance)}", color = if (customer.creditBalance > 0) Amber700 else Green700, fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' } },
                     label = { Text("Payment Amount") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
                 )
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
                     label = { Text("Notes (optional)") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
                 )
             }
         },
@@ -280,7 +308,8 @@ private fun PaymentDialog(
                         val amt = amount.toDoubleOrNull() ?: 0.0
                         if (amt > 0) onRecord(amt, notes)
                     },
-                    enabled = amount.toDoubleOrNull() ?: 0.0 > 0
+                    enabled = amount.toDoubleOrNull() ?: 0.0 > 0,
+                    shape = RoundedCornerShape(10.dp)
                 ) { Text("Record Payment") }
             }
         }
@@ -298,26 +327,30 @@ private fun PaymentHistoryDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("Close") }
         },
-        title = { Text("Payment History - ${customer.name}", fontWeight = FontWeight.Bold) },
+        title = { Text("Payment History", fontWeight = FontWeight.Bold) },
         text = {
-            if (payments.isEmpty()) {
-                Box(Modifier.height(100.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("No payments recorded", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                LazyColumn(modifier = Modifier.height(300.dp)) {
-                    items(payments, key = { it.id }) { payment ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text("PHP ${"%.2f".format(payment.amount)}", fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
-                                Text(payment.date, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (payment.notes.isNotBlank()) Text(payment.notes, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column {
+                Text(customer.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Grey600)
+                Spacer(Modifier.height(8.dp))
+                if (payments.isEmpty()) {
+                    Box(Modifier.height(100.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("No payments recorded", color = Grey600)
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.height(300.dp)) {
+                        items(payments, key = { it.id }) { payment ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text("PHP ${"%.2f".format(payment.amount)}", fontWeight = FontWeight.Bold, color = Green700)
+                                    Text(payment.date, fontSize = 11.sp, color = Grey600)
+                                    if (payment.notes.isNotBlank()) Text(payment.notes, fontSize = 11.sp, color = Grey600)
+                                }
                             }
+                            if (payment != payments.last()) Divider()
                         }
-                        if (payment != payments.last()) Divider()
                     }
                 }
             }

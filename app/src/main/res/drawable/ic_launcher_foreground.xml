@@ -4,16 +4,20 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Shopping bag body -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M34,40h40v4H34zM34,48h40v4H34zM34,56h28v4H34zM34,64h36v4H34z" />
+        android:pathData="M37,36h34l-4,38H41L37,36z" />
+    <!-- Bag handle left -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,30l-12,12h24z" />
+        android:pathData="M45,36c0,-8 0,-8 9,-8c9,0 9,0 9,8" />
+    <!-- Barcode lines -->
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M46,48h2v16h-2zM50,48h1v16h-1zM53,48h3v16h-3zM58,48h2v16h-2zM62,48h1v16h-1z" />
+    <!-- Dollar/price dot -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M60,72a4,4 0,1 0,8 0a4,4 0,1 0,-8 0" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M40,72a4,4 0,1 0,8 0a4,4 0,1 0,-8 0" />
+        android:pathData="M50,70C50,68.9 50.9,68 52,68C53.1,68 54,68.9 54,70C54,71.1 53.1,72 52,72C50.9,72 50,71.1 50,70z" />
 </vector>

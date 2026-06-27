@@ -10,6 +10,7 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -39,6 +40,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.salesinventory.app.data.InventoryItem
 import com.salesinventory.app.scanner.BarcodeAnalyzer
+import com.salesinventory.app.ui.theme.*
 import com.salesinventory.app.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,7 +64,7 @@ fun InventoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Inventory") },
+                title = { Text("Inventory", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -74,10 +76,10 @@ fun InventoryScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = Blue800,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White
                 ),
                 windowInsets = WindowInsets(0, 0, 0, 0)
             )
@@ -89,20 +91,24 @@ fun InventoryScreen(
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
                 placeholder = { Text("Search by name or barcode...") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Grey600) },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
             )
 
             if (filteredItems.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Filled.List, contentDescription = "Inventory", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Filled.Inventory2, contentDescription = "Inventory", modifier = Modifier.size(64.dp), tint = Grey400)
                         Spacer(Modifier.height(16.dp))
                         Text("No items found", style = MaterialTheme.typography.titleMedium)
-                        Text("Add items to your inventory", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (inventory.isEmpty()) "Add items to your inventory" else "Try a different search", color = Grey600)
                         Spacer(Modifier.height(16.dp))
-                        Button(onClick = { showAddDialog = true }) {
-                            Icon(Icons.Filled.Add, contentDescription = null)
+                        Button(
+                            onClick = { showAddDialog = true },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Add Item")
                         }
@@ -167,17 +173,19 @@ private fun InventoryItemCard(
     onDelete: () -> Unit
 ) {
     val stockColor = when {
-        item.stock <= 0 -> MaterialTheme.colorScheme.error
-        item.stock <= 5 -> androidx.compose.ui.graphics.Color(0xFFF57F17)
+        item.stock <= 0 -> Red700
+        item.stock <= 5 -> Amber700
         else -> MaterialTheme.colorScheme.onSurface
     }
 
     Card(
         onClick = onEdit,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (item.imageUri.isNotBlank()) {
@@ -187,36 +195,38 @@ private fun InventoryItemCard(
                         .crossfade(true)
                         .build(),
                     contentDescription = null,
-                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)),
+                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
                     contentScale = ContentScale.Crop
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(10.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(item.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("Barcode: ${item.barcode}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(item.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(2.dp))
+                Text("Barcode: ${item.barcode}", fontSize = 11.sp, color = Grey600)
+                Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("PHP ${"%.2f".format(item.price)}", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                    Text("PHP ${"%.2f".format(item.price)}", fontWeight = FontWeight.SemiBold, color = Blue800, fontSize = 14.sp)
                     Spacer(Modifier.width(16.dp))
-                    Text("Stock: ", fontSize = 13.sp)
+                    Text("Stock: ", fontSize = 13.sp, color = Grey600)
                     Text("${item.stock}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = stockColor)
                     Spacer(Modifier.width(4.dp))
-                    Text(item.unit, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(item.unit, fontSize = 12.sp, color = Grey600)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (item.size.isNotBlank()) {
-                        Text("Size: ${item.size}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Size: ${item.size}", fontSize = 11.sp, color = Grey600)
                     }
                     if (item.color.isNotBlank()) {
-                        Text("Color: ${item.color}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Color: ${item.color}", fontSize = 11.sp, color = Grey600)
                     }
                     if (item.category.isNotBlank()) {
-                        Text(item.category, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(item.category, fontSize = 11.sp, color = Grey600)
                     }
                 }
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = Red700)
             }
         }
     }
@@ -269,41 +279,42 @@ internal fun AddItemDialog(
         )
     }
 
-
-
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Inventory Item") },
+        title = { Text("Add Inventory Item", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(value = barcode, onValueChange = { barcode = it }, label = { Text("Barcode *") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = barcode, onValueChange = { barcode = it }, label = { Text("Barcode *") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp))
                     IconButton(onClick = { showScanner = true }) {
-                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scan Barcode")
+                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scan Barcode", tint = Blue800)
                     }
                 }
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Product Name *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Product Name *") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = size, onValueChange = { size = it }, label = { Text("Size") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("M, XL, 42") })
-                    OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text("Color") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("Red, Blue") })
+                    OutlinedTextField(value = size, onValueChange = { size = it }, label = { Text("Size") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("M, XL, 42") }, shape = RoundedCornerShape(10.dp))
+                    OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text("Color") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("Red, Blue") }, shape = RoundedCornerShape(10.dp))
                 }
-                OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Price *") }, singleLine = true, modifier = Modifier.weight(1f), prefix = { Text("PHP ") })
-                    OutlinedTextField(value = costPrice, onValueChange = { costPrice = it }, label = { Text("Cost Price") }, singleLine = true, modifier = Modifier.weight(1f), prefix = { Text("PHP ") })
+                    OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Price *") }, singleLine = true, modifier = Modifier.weight(1f), prefix = { Text("PHP ") }, shape = RoundedCornerShape(10.dp))
+                    OutlinedTextField(value = costPrice, onValueChange = { costPrice = it }, label = { Text("Cost Price") }, singleLine = true, modifier = Modifier.weight(1f), prefix = { Text("PHP ") }, shape = RoundedCornerShape(10.dp))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = stock, onValueChange = { stock = it }, label = { Text("Stock *") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = minStock, onValueChange = { minStock = it }, label = { Text("Min Stock") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = stock, onValueChange = { stock = it }, label = { Text("Stock *") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp))
+                    OutlinedTextField(value = minStock, onValueChange = { minStock = it }, label = { Text("Min Stock") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp))
                 }
-                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Unit") }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("pcs, kg, box") })
-                OutlinedTextField(value = subLabel, onValueChange = { subLabel = it }, label = { Text("Sub Label") }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("MS, CS, LS") })
+                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Unit") }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("pcs, kg, box") }, shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = subLabel, onValueChange = { subLabel = it }, label = { Text("Sub Label") }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("MS, CS, LS") }, shape = RoundedCornerShape(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (imageUri.isNotBlank()) {
                         AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(imageUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
                         Spacer(Modifier.width(8.dp))
                     }
-                    OutlinedButton(onClick = { imagePicker.launch("image/*") }) {
+                    OutlinedButton(
+                        onClick = { imagePicker.launch("image/*") },
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
                         Icon(Icons.Filled.Image, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Photo", fontSize = 12.sp)
@@ -326,7 +337,8 @@ internal fun AddItemDialog(
                         onSave(InventoryItem(barcode = barcode.trim(), name = name.trim(), category = category.trim(), price = priceVal, costPrice = costPrice.toDoubleOrNull() ?: 0.0, stock = stockVal, unit = unit.ifBlank { "pcs" }, size = size.trim(), color = color.trim(), subLabel = subLabel.trim().uppercase(), minStock = minStock.toIntOrNull() ?: 0, imageUri = imageUri))
                     }
                 },
-                enabled = barcode.isNotBlank() && name.isNotBlank() && (price.toDoubleOrNull() ?: 0.0) > 0
+                enabled = barcode.isNotBlank() && name.isNotBlank() && (price.toDoubleOrNull() ?: 0.0) > 0,
+                shape = RoundedCornerShape(10.dp)
             ) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
@@ -380,37 +392,40 @@ private fun EditItemDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Item") },
+        title = { Text("Edit Item", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(value = barcode, onValueChange = { barcode = it }, label = { Text("Barcode *") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = barcode, onValueChange = { barcode = it }, label = { Text("Barcode *") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp))
                     IconButton(onClick = { showScanner = true }) {
-                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scan Barcode")
+                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scan Barcode", tint = Blue800)
                     }
                 }
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Product Name *") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Product Name *") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = size, onValueChange = { size = it }, label = { Text("Size") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("M, XL, 42") })
-                    OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text("Color") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("Red, Blue") })
+                    OutlinedTextField(value = size, onValueChange = { size = it }, label = { Text("Size") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("M, XL, 42") }, shape = RoundedCornerShape(10.dp))
+                    OutlinedTextField(value = color, onValueChange = { color = it }, label = { Text("Color") }, singleLine = true, modifier = Modifier.weight(1f), placeholder = { Text("Red, Blue") }, shape = RoundedCornerShape(10.dp))
                 }
-                OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Price *") }, singleLine = true, modifier = Modifier.weight(1f), prefix = { Text("PHP ") })
-                    OutlinedTextField(value = costPrice, onValueChange = { costPrice = it }, label = { Text("Cost Price") }, singleLine = true, modifier = Modifier.weight(1f), prefix = { Text("PHP ") })
+                    OutlinedTextField(value = price, onValueChange = { price = it }, label = { Text("Price *") }, singleLine = true, modifier = Modifier.weight(1f), prefix = { Text("PHP ") }, shape = RoundedCornerShape(10.dp))
+                    OutlinedTextField(value = costPrice, onValueChange = { costPrice = it }, label = { Text("Cost Price") }, singleLine = true, modifier = Modifier.weight(1f), prefix = { Text("PHP ") }, shape = RoundedCornerShape(10.dp))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = stock, onValueChange = { stock = it }, label = { Text("Stock *") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = minStock, onValueChange = { minStock = it }, label = { Text("Min Stock") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = stock, onValueChange = { stock = it }, label = { Text("Stock *") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp))
+                    OutlinedTextField(value = minStock, onValueChange = { minStock = it }, label = { Text("Min Stock") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp))
                 }
-                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Unit") }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("pcs, kg, box") })
-                OutlinedTextField(value = subLabel, onValueChange = { subLabel = it }, label = { Text("Sub Label") }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("MS, CS, LS") })
+                OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Unit") }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("pcs, kg, box") }, shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = subLabel, onValueChange = { subLabel = it }, label = { Text("Sub Label") }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("MS, CS, LS") }, shape = RoundedCornerShape(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (imageUri.isNotBlank()) {
                         AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(imageUri).crossfade(true).build(), contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
                         Spacer(Modifier.width(8.dp))
                     }
-                    OutlinedButton(onClick = { imagePicker.launch("image/*") }) {
+                    OutlinedButton(
+                        onClick = { imagePicker.launch("image/*") },
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
                         Icon(Icons.Filled.Image, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Photo", fontSize = 12.sp)
@@ -433,7 +448,8 @@ private fun EditItemDialog(
                         onSave(InventoryItem(barcode = barcode.trim(), name = name.trim(), category = category.trim(), price = priceVal, costPrice = costPrice.toDoubleOrNull() ?: 0.0, stock = stockVal, unit = unit.ifBlank { "pcs" }, size = size.trim(), color = color.trim(), subLabel = subLabel.trim().uppercase(), minStock = minStock.toIntOrNull() ?: 0, imageUri = imageUri))
                     }
                 },
-                enabled = barcode.isNotBlank() && name.isNotBlank() && (price.toDoubleOrNull() ?: 0.0) > 0
+                enabled = barcode.isNotBlank() && name.isNotBlank() && (price.toDoubleOrNull() ?: 0.0) > 0,
+                shape = RoundedCornerShape(10.dp)
             ) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }

@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.salesinventory.app.data.Supplier
+import com.salesinventory.app.ui.theme.*
 import com.salesinventory.app.viewmodel.MainViewModel
 import java.util.*
 
@@ -35,7 +36,7 @@ fun SupplierScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Suppliers") },
+                title = { Text("Suppliers", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -47,9 +48,10 @@ fun SupplierScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = Blue800,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White
                 ),
                 windowInsets = WindowInsets(0, 0, 0, 0)
             )
@@ -61,11 +63,14 @@ fun SupplierScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.Business, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Filled.Business, contentDescription = null, modifier = Modifier.size(64.dp), tint = Grey400)
                     Spacer(Modifier.height(8.dp))
-                    Text("No suppliers yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("No suppliers yet", color = Grey600)
                     Spacer(Modifier.height(8.dp))
-                    Button(onClick = { editingSupplier = null; showDialog = true }) {
+                    Button(
+                        onClick = { editingSupplier = null; showDialog = true },
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
                         Text("Add Supplier")
                     }
                 }
@@ -77,19 +82,23 @@ fun SupplierScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(suppliers, key = { it.id }) { supplier ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = CardDefaults.cardElevation(1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(supplier.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Text(supplier.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                     if (supplier.contactPerson.isNotBlank()) {
-                                        Text("Contact: ${supplier.contactPerson}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("Contact: ${supplier.contactPerson}", fontSize = 13.sp, color = Grey600)
                                     }
                                     if (supplier.phone.isNotBlank()) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Filled.Phone, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Icon(Icons.Filled.Phone, contentDescription = null, modifier = Modifier.size(14.dp), tint = Grey600)
                                             Spacer(Modifier.width(4.dp))
-                                            Text(supplier.phone, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(supplier.phone, fontSize = 13.sp, color = Grey600)
                                         }
                                     }
                                 }
@@ -150,19 +159,19 @@ private fun SupplierDialog(
         title = { Text(if (supplier == null) "Add Supplier" else "Edit Supplier", fontWeight = FontWeight.Bold) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Company Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = contactPerson, onValueChange = { contactPerson = it }, label = { Text("Contact Person") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Phone") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Company Name") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = contactPerson, onValueChange = { contactPerson = it }, label = { Text("Contact Person") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("Phone") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Address") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
+                OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notes") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp))
             }
         },
         confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (onDelete != null) {
                     TextButton(onClick = onDelete) {
-                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                        Text("Delete", color = Red700)
                     }
                 }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -182,7 +191,8 @@ private fun SupplierDialog(
                             )
                         }
                     },
-                    enabled = name.isNotBlank()
+                    enabled = name.isNotBlank(),
+                    shape = RoundedCornerShape(10.dp)
                 ) { Text("Save") }
             }
         }

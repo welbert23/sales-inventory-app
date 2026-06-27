@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +25,7 @@ import com.salesinventory.app.data.InventoryItem
 import com.salesinventory.app.data.ReportSettings
 import com.salesinventory.app.data.ReportSettingsManager
 import com.salesinventory.app.data.SaleRecord
+import com.salesinventory.app.ui.theme.*
 import com.salesinventory.app.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -66,6 +69,7 @@ fun SalesReportScreen(
 
     var showShareDialog by remember { mutableStateOf(false) }
     var shareText by remember { mutableStateOf("") }
+    var selectedTransactionSales by remember { mutableStateOf<List<SaleRecord>?>(null) }
 
     val reportText = remember(filteredSales, totalSales, totalItems, inventory, settings) {
         buildReportText(sales, filteredSales, totalSales, totalItems, inventory, settings)
@@ -74,7 +78,7 @@ fun SalesReportScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sales History") },
+                title = { Text("Sales History", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -105,10 +109,10 @@ fun SalesReportScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = Blue800,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White
                 ),
                 windowInsets = WindowInsets(0, 0, 0, 0)
             )
@@ -117,23 +121,25 @@ fun SalesReportScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Blue50)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Sales Summary", fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text("Sales Summary", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Blue900)
+                    Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("PHP ${"%.2f".format(totalSales)}", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
-                            Text("Total Sales", fontSize = 12.sp)
+                            Text("PHP ${"%.2f".format(totalSales)}", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Blue800)
+                            Text("Total Sales", fontSize = 12.sp, color = Grey600)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("$totalItems", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
-                            Text("Items Sold", fontSize = 12.sp)
+                            Text("$totalItems", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Blue800)
+                            Text("Items Sold", fontSize = 12.sp, color = Grey600)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${filteredSales.size}", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
-                            Text("Transactions", fontSize = 12.sp)
+                            val txCount = filteredSales.groupBy { it.transactionId.ifBlank { it.id } }.size
+                            Text("$txCount", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Blue800)
+                            Text("Transactions", fontSize = 12.sp, color = Grey600)
                         }
                     }
                 }
@@ -141,13 +147,14 @@ fun SalesReportScreen(
 
             ScrollableTabRow(
                 selectedTabIndex = filterOption,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                edgePadding = 0.dp
             ) {
                 filterOptions.forEachIndexed { index, label ->
                     Tab(
                         selected = filterOption == index,
                         onClick = { filterOption = index },
-                        text = { Text(label) }
+                        text = { Text(label, fontSize = 13.sp) }
                     )
                 }
             }
@@ -155,21 +162,73 @@ fun SalesReportScreen(
             if (filteredSales.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Filled.List, contentDescription = "Sales", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Filled.Assessment, contentDescription = "Sales", modifier = Modifier.size(64.dp), tint = Grey400)
                         Spacer(Modifier.height(16.dp))
                         Text("No sales records", style = MaterialTheme.typography.titleMedium)
-                        Text("Start scanning items to record sales", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Start scanning items to record sales", color = Grey600)
                     }
                 }
             } else {
+                val grouped = filteredSales
+                    .groupBy { it.transactionId.ifBlank { it.id } }
+                    .map { (tid, sales) -> tid to sales.sortedBy { it.id } }
+                    .sortedByDescending { (_, sales) -> sales.maxOf { it.date } }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(filteredSales.sortedByDescending { it.date }, key = { it.id }) { sale ->
-                        SaleCard(sale = sale)
+                    items(grouped, key = { it.first }) { (tid, sales) ->
+                        val first = sales.first()
+                        val total = sales.sumOf { it.total }
+                        Surface(
+                            onClick = { selectedTransactionSales = sales },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.White
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("#${tid}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text(first.date.take(10), fontSize = 11.sp, color = Grey600)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("PHP ${"%.2f".format(total)}", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Blue800)
+                                    Text("${sales.sumOf { it.quantity }} item(s)", fontSize = 11.sp, color = Grey600)
+                                }
+                            }
+                        }
                     }
+                }
+            }
+        }
+    }
+
+    selectedTransactionSales?.let { sales ->
+        Dialog(
+            onDismissRequest = { selectedTransactionSales = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .fillMaxHeight(0.8f),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Receipt Preview", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        IconButton(onClick = { selectedTransactionSales = null }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Close")
+                        }
+                    }
+                    Divider()
+                    TransactionReceiptCard(sales = sales)
                 }
             }
         }
@@ -208,19 +267,17 @@ fun SalesReportScreen(
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                            actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                            containerColor = Blue800,
+                            titleContentColor = Color.White,
+                            navigationIconContentColor = Color.White,
+                            actionIconContentColor = Color.White
                         )
                     )
                     OutlinedTextField(
                         value = shareText,
                         onValueChange = { shareText = it },
                         modifier = Modifier.fillMaxSize().padding(12.dp),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace
-                        )
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
                     )
                 }
             }
@@ -229,29 +286,65 @@ fun SalesReportScreen(
 }
 
 @Composable
-private fun SaleCard(sale: SaleRecord) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(sale.productName, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    Text("PHP ${"%.2f".format(sale.total)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+private fun TransactionReceiptCard(sales: List<SaleRecord>) {
+    val first = sales.first()
+    val subtotal = sales.sumOf { it.subtotal }
+    val discountAmt = sales.sumOf { it.discountAmount }
+    val total = sales.sumOf { it.total }
+    val totalQty = sales.sumOf { it.quantity }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+    ) {
+        // Transaction header
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("#${first.transactionId.ifBlank { first.id }}", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Grey600)
+            Text(first.date.take(10), fontSize = 11.sp, color = Grey600)
+        }
+        Text(if (first.customerType.isNotBlank()) first.customerType else "Walk-in", fontSize = 11.sp, color = if (first.customerType == "Online") Blue800 else Green700)
+        if (first.customerId.isNotBlank()) {
+            Text("Customer ID: ${first.customerId}", fontSize = 11.sp, color = Grey600)
+        }
+        Text(first.paymentType.name, fontSize = 11.sp, color = Grey600)
+
+        Divider(modifier = Modifier.padding(vertical = 6.dp))
+
+        // Items list
+        sales.forEach { sale ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(sale.productName, fontWeight = FontWeight.Medium, fontSize = 13.sp, maxLines = 1)
+                    Text("PHP ${"%.2f".format(sale.unitPrice)} x ${sale.quantity}", fontSize = 11.sp, color = Grey600)
                 }
-                Spacer(Modifier.height(4.dp))
-                Row {
-                    Text("Qty: ${sale.quantity} ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("@ PHP ${"%.2f".format(sale.unitPrice)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text(sale.date, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (sale.discountAmount > 0) {
-                        Text("Disc: -PHP ${"%.2f".format(sale.discountAmount)}", fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFFF57F17))
-                    }
-                }
+                Text("PHP ${"%.2f".format(sale.unitPrice * sale.quantity)}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 6.dp))
+
+        // Totals
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Items:", fontSize = 12.sp, color = Grey600)
+            Text("$totalQty", fontSize = 12.sp, color = Grey600)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Subtotal:", fontSize = 12.sp)
+            Text("PHP ${"%.2f".format(subtotal)}", fontSize = 12.sp)
+        }
+        if (discountAmt > 0) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Discount:", fontSize = 12.sp, color = Amber700)
+                Text("-PHP ${"%.2f".format(discountAmt)}", fontSize = 12.sp, color = Amber700)
+            }
+        }
+        Divider(modifier = Modifier.padding(vertical = 4.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("TOTAL:", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("PHP ${"%.2f".format(total)}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Blue800)
         }
     }
 }

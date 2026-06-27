@@ -20,21 +20,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.salesinventory.app.ui.navigation.Screen
 import com.salesinventory.app.ui.screens.*
+import com.salesinventory.app.ui.theme.SalesInventoryTheme
 import com.salesinventory.app.viewmodel.MainViewModel
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(
-                colorScheme = lightColorScheme(
-                    primary = androidx.compose.ui.graphics.Color(0xFF1565C0),
-                    onPrimary = androidx.compose.ui.graphics.Color.White,
-                    primaryContainer = androidx.compose.ui.graphics.Color(0xFFD1E4FF),
-                    secondary = androidx.compose.ui.graphics.Color(0xFF1E88E5),
-                    error = androidx.compose.ui.graphics.Color(0xFFD32F2F)
-                )
-            ) {
+            SalesInventoryTheme {
                 SalesInventoryApp()
             }
         }

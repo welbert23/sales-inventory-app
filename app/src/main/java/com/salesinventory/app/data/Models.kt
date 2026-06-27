@@ -29,6 +29,7 @@ data class SaleRecord(
     val subtotal: Double = 0.0,
     val total: Double = 0.0,
     val customerId: String = "",
+    val customerType: String = "",
     val paymentType: PaymentType = PaymentType.CASH,
     val isCredit: Boolean = false,
     val transactionId: String = ""
@@ -66,6 +67,7 @@ data class Customer(
     val phone: String = "",
     val email: String = "",
     val address: String = "",
+    val customerType: String = "Walk-in",
     val creditBalance: Double = 0.0,
     val totalPurchases: Double = 0.0,
     val notes: String = ""
