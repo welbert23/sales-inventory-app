@@ -79,7 +79,9 @@ fun SalesReportScreen(
     var shareText by remember { mutableStateOf("") }
     var selectedTransactionSales by remember { mutableStateOf<List<SaleRecord>?>(null) }
     var showReprintPicker by remember { mutableStateOf(false) }
+    var showPrintCopyDialog by remember { mutableStateOf(false) }
     var reprintPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var reprintCopyCount by remember { mutableStateOf(1) }
     var hasBluetoothPermission by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= 31) {
@@ -256,13 +258,7 @@ fun SalesReportScreen(
                         Text("Receipt Preview", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Row {
                             IconButton(onClick = {
-                                if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
-                                    bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-                                } else {
-                                    reprintPrinters = BluetoothPrinter.getPairedPrinters()
-                                    if (reprintPrinters.isNotEmpty()) showReprintPicker = true
-                                    else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
-                                }
+                                showPrintCopyDialog = true
                             }) {
                                 Icon(Icons.Filled.Print, contentDescription = "Reprint")
                             }
@@ -278,6 +274,43 @@ fun SalesReportScreen(
         }
     }
 
+    if (showPrintCopyDialog) {
+        AlertDialog(
+            onDismissRequest = { showPrintCopyDialog = false },
+            title = { Text("Print Receipt?") },
+            text = { Text("How many copies do you want to print?") },
+            confirmButton = {
+                Column {
+                    TextButton(onClick = {
+                        showPrintCopyDialog = false
+                        reprintCopyCount = 1
+                        if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
+                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        } else {
+                            reprintPrinters = BluetoothPrinter.getPairedPrinters()
+                            if (reprintPrinters.isNotEmpty()) showReprintPicker = true
+                            else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+                        }
+                    }) { Text("Print (1 copy)") }
+                    TextButton(onClick = {
+                        showPrintCopyDialog = false
+                        reprintCopyCount = 2
+                        if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
+                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        } else {
+                            reprintPrinters = BluetoothPrinter.getPairedPrinters()
+                            if (reprintPrinters.isNotEmpty()) showReprintPicker = true
+                            else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+                        }
+                    }) { Text("Print (2 copies — customer + store)") }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPrintCopyDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     if (showReprintPicker) {
         val tid = selectedTransactionSales?.first()?.transactionId?.ifBlank { selectedTransactionSales?.first()?.id } ?: ""
         AlertDialog(
@@ -290,7 +323,7 @@ fun SalesReportScreen(
                             TextButton(
                                 onClick = {
                                     showReprintPicker = false
-                                    viewModel.printReceipt(tid, address) { success ->
+                                    viewModel.printReceipt(tid, address, reprintCopyCount) { success ->
                                         if (success) Toast.makeText(context, "Receipt printed", Toast.LENGTH_SHORT).show()
                                         else Toast.makeText(context, "Print failed", Toast.LENGTH_SHORT).show()
                                     }

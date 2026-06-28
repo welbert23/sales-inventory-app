@@ -421,7 +421,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ----- BLUETOOTH -----
 
-    fun printReceipt(transactionId: String, address: String, callback: (Boolean) -> Unit) {
+    fun printReceipt(transactionId: String, address: String, copies: Int = 1, callback: (Boolean) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val connected = BluetoothPrinter.connect(address)
@@ -433,11 +433,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val paymentType = sales.firstOrNull()?.paymentType?.displayName ?: "Cash"
                 val settings = settingsManager.load()
 
-                val result = BluetoothPrinter.printReceipt(
-                    settings.storeName, items, total, paymentType, transactionId
-                )
+                var success = true
+                for (i in 1..copies) {
+                    val ok = BluetoothPrinter.printReceipt(
+                        settings.storeName, items, total, paymentType, transactionId
+                    )
+                    if (!ok) success = false
+                }
                 BluetoothPrinter.disconnect()
-                callback(result)
+                callback(success)
             } catch (e: Exception) {
                 callback(false)
             }

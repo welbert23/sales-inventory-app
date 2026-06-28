@@ -58,6 +58,7 @@ fun BulkCheckoutScreen(
     var showPrintDialog by remember { mutableStateOf(false) }
     var showPrinterPicker by remember { mutableStateOf(false) }
     var pairedPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var printCopyCount by remember { mutableStateOf(1) }
     var hasBluetoothPermission by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= 31) {
@@ -433,16 +434,30 @@ fun BulkCheckoutScreen(
             title = { Text("Print Receipt?") },
             text = { Text("Do you want to print a receipt for this transaction?") },
             confirmButton = {
-                TextButton(onClick = {
-                    showPrintDialog = false
-                    if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
-                        bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-                    } else {
-                        pairedPrinters = BluetoothPrinter.getPairedPrinters()
-                        if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
-                        else localError = "No paired Bluetooth printers found"
-                    }
-                }) { Text("Print") }
+                Column {
+                    TextButton(onClick = {
+                        showPrintDialog = false
+                        printCopyCount = 1
+                        if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
+                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        } else {
+                            pairedPrinters = BluetoothPrinter.getPairedPrinters()
+                            if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+                            else localError = "No paired Bluetooth printers found"
+                        }
+                    }) { Text("Print (1 copy)") }
+                    TextButton(onClick = {
+                        showPrintDialog = false
+                        printCopyCount = 2
+                        if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
+                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        } else {
+                            pairedPrinters = BluetoothPrinter.getPairedPrinters()
+                            if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+                            else localError = "No paired Bluetooth printers found"
+                        }
+                    }) { Text("Print (2 copies — customer + store)") }
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showPrintDialog = false }) { Text("No") }
@@ -461,7 +476,7 @@ fun BulkCheckoutScreen(
                             TextButton(
                                 onClick = {
                                     showPrinterPicker = false
-                                    viewModel.printReceipt(lastTransactionId, address) { success ->
+                                    viewModel.printReceipt(lastTransactionId, address, printCopyCount) { success ->
                                         if (success) localError = "Receipt printed"
                                         else localError = "Print failed"
                                     }

@@ -13,7 +13,7 @@ An Android point-of-sale and inventory management app built with Jetpack Compose
 - **Profit Tracking** — Cost price tracking and profit calculation per sale
 - **Discounts** — Percentage or fixed-amount discount support
 - **Dashboard** — Overall and daily sales/profit overview with comparative analysis
-- **Bluetooth Printing** — Print receipts via Bluetooth thermal printer
+- **Bluetooth Printing** — Print receipts via Bluetooth thermal printer with 1 or 2 copies (customer + store)
 
 ## Tech Stack
 

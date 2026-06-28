@@ -76,6 +76,7 @@ fun ScanScreen(
     var showPrintDialog by remember { mutableStateOf(false) }
     var showPrinterPicker by remember { mutableStateOf(false) }
     var pairedPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var printCopyCount by remember { mutableStateOf(1) }
     val scope = rememberCoroutineScope()
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -508,16 +509,30 @@ fun ScanScreen(
             title = { Text("Print Receipt?") },
             text = { Text("Do you want to print a receipt for this transaction?") },
             confirmButton = {
-                TextButton(onClick = {
-                    showPrintDialog = false
-                    if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
-                        bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-                    } else {
-                        pairedPrinters = BluetoothPrinter.getPairedPrinters()
-                        if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
-                        else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
-                    }
-                }) { Text("Print") }
+                Column {
+                    TextButton(onClick = {
+                        showPrintDialog = false
+                        printCopyCount = 1
+                        if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
+                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        } else {
+                            pairedPrinters = BluetoothPrinter.getPairedPrinters()
+                            if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+                            else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+                        }
+                    }) { Text("Print (1 copy)") }
+                    TextButton(onClick = {
+                        showPrintDialog = false
+                        printCopyCount = 2
+                        if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
+                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        } else {
+                            pairedPrinters = BluetoothPrinter.getPairedPrinters()
+                            if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+                            else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+                        }
+                    }) { Text("Print (2 copies — customer + store)") }
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showPrintDialog = false }) { Text("No") }
@@ -536,7 +551,7 @@ fun ScanScreen(
                             TextButton(
                                 onClick = {
                                     showPrinterPicker = false
-                                    viewModel.printReceipt(lastTransactionId, address) { success ->
+                                    viewModel.printReceipt(lastTransactionId, address, printCopyCount) { success ->
                                         if (success) Toast.makeText(context, "Receipt printed", Toast.LENGTH_SHORT).show()
                                         else Toast.makeText(context, "Print failed", Toast.LENGTH_SHORT).show()
                                     }
