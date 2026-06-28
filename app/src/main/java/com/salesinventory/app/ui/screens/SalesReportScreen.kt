@@ -74,8 +74,6 @@ fun SalesReportScreen(
     var selectedTransactionSales by remember { mutableStateOf<List<SaleRecord>?>(null) }
     var showReprintPicker by remember { mutableStateOf(false) }
     var reprintPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-    var scanningReprint by remember { mutableStateOf(false) }
-    var discoveredReprint by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
 
     val reportText = remember(filteredSales, totalSales, totalItems, inventory, settings) {
         buildReportText(sales, filteredSales, totalSales, totalItems, inventory, settings)
@@ -252,23 +250,15 @@ fun SalesReportScreen(
     if (showReprintPicker) {
         val tid = selectedTransactionSales?.first()?.transactionId?.ifBlank { selectedTransactionSales?.first()?.id } ?: ""
         AlertDialog(
-            onDismissRequest = { showReprintPicker = false; scanningReprint = false; BluetoothPrinter.stopDiscovery(context) },
+            onDismissRequest = { showReprintPicker = false },
             title = { Text("Select Printer") },
             text = {
                 Column {
-                    if (scanningReprint) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        Spacer(Modifier.height(8.dp))
-                        Text("Searching for nearby devices...", fontSize = 13.sp, color = Grey600)
-                    }
-                    val allPrinters = reprintPrinters + discoveredReprint
-                    if (allPrinters.isNotEmpty()) {
-                        allPrinters.forEach { (address, name) ->
+                    if (reprintPrinters.isNotEmpty()) {
+                        reprintPrinters.forEach { (address, name) ->
                             TextButton(
                                 onClick = {
                                     showReprintPicker = false
-                                    scanningReprint = false
-                                    BluetoothPrinter.stopDiscovery(context)
                                     viewModel.printReceipt(tid, address) { success ->
                                         if (success) Toast.makeText(context, "Receipt printed", Toast.LENGTH_SHORT).show()
                                         else Toast.makeText(context, "Print failed", Toast.LENGTH_SHORT).show()
@@ -279,38 +269,25 @@ fun SalesReportScreen(
                                 Text(name)
                             }
                         }
-                    } else if (!scanningReprint) {
-                        Text("No printers found", fontSize = 13.sp, color = Grey600, modifier = Modifier.padding(8.dp))
+                    } else {
+                        Text("No paired Bluetooth printers found", fontSize = 13.sp, color = Grey600, modifier = Modifier.padding(8.dp))
                     }
                     Spacer(Modifier.height(8.dp))
-                    if (!scanningReprint) {
-                        OutlinedButton(
-                            onClick = {
-                                scanningReprint = true
-                                discoveredReprint = emptyList()
-                                BluetoothPrinter.startDiscovery(
-                                    context,
-                                    onDeviceFound = { entry -> discoveredReprint = discoveredReprint + entry },
-                                    onFinished = { scanningReprint = false }
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Search for nearby devices")
-                        }
-                    } else {
-                        TextButton(
-                            onClick = { scanningReprint = false; BluetoothPrinter.stopDiscovery(context) }
-                        ) {
-                            Text("Stop search")
-                        }
+                    OutlinedButton(
+                        onClick = {
+                            showReprintPicker = false
+                            BluetoothPrinter.openBluetoothSettings(context)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Open Bluetooth Settings to pair printer")
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showReprintPicker = false; scanningReprint = false; BluetoothPrinter.stopDiscovery(context) }) { Text("Cancel") }
+                TextButton(onClick = { showReprintPicker = false }) { Text("Cancel") }
             }
         )
     }

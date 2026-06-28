@@ -75,8 +75,6 @@ fun ScanScreen(
     var showPrintDialog by remember { mutableStateOf(false) }
     var showPrinterPicker by remember { mutableStateOf(false) }
     var pairedPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-    var scanning by remember { mutableStateOf(false) }
-    var discoveredPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     val scope = rememberCoroutineScope()
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -503,23 +501,15 @@ fun ScanScreen(
 
     if (showPrinterPicker) {
         AlertDialog(
-            onDismissRequest = { showPrinterPicker = false; scanning = false; BluetoothPrinter.stopDiscovery(context) },
+            onDismissRequest = { showPrinterPicker = false },
             title = { Text("Select Printer") },
             text = {
                 Column {
-                    if (scanning) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        Spacer(Modifier.height(8.dp))
-                        Text("Searching for nearby devices...", fontSize = 13.sp, color = Grey600)
-                    }
-                    val allPrinters = pairedPrinters + discoveredPrinters
-                    if (allPrinters.isNotEmpty()) {
-                        allPrinters.forEach { (address, name) ->
+                    if (pairedPrinters.isNotEmpty()) {
+                        pairedPrinters.forEach { (address, name) ->
                             TextButton(
                                 onClick = {
                                     showPrinterPicker = false
-                                    scanning = false
-                                    BluetoothPrinter.stopDiscovery(context)
                                     viewModel.printReceipt(lastTransactionId, address) { success ->
                                         if (success) Toast.makeText(context, "Receipt printed", Toast.LENGTH_SHORT).show()
                                         else Toast.makeText(context, "Print failed", Toast.LENGTH_SHORT).show()
@@ -530,38 +520,25 @@ fun ScanScreen(
                                 Text(name)
                             }
                         }
-                    } else if (!scanning) {
-                        Text("No printers found", fontSize = 13.sp, color = Grey600, modifier = Modifier.padding(8.dp))
+                    } else {
+                        Text("No paired Bluetooth printers found", fontSize = 13.sp, color = Grey600, modifier = Modifier.padding(8.dp))
                     }
                     Spacer(Modifier.height(8.dp))
-                    if (!scanning) {
-                        OutlinedButton(
-                            onClick = {
-                                scanning = true
-                                discoveredPrinters = emptyList()
-                                BluetoothPrinter.startDiscovery(
-                                    context,
-                                    onDeviceFound = { entry -> discoveredPrinters = discoveredPrinters + entry },
-                                    onFinished = { scanning = false }
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Search for nearby devices")
-                        }
-                    } else {
-                        TextButton(
-                            onClick = { scanning = false; BluetoothPrinter.stopDiscovery(context) }
-                        ) {
-                            Text("Stop search")
-                        }
+                    OutlinedButton(
+                        onClick = {
+                            showPrinterPicker = false
+                            BluetoothPrinter.openBluetoothSettings(context)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Open Bluetooth Settings to pair printer")
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showPrinterPicker = false; scanning = false; BluetoothPrinter.stopDiscovery(context) }) { Text("Cancel") }
+                TextButton(onClick = { showPrinterPicker = false }) { Text("Cancel") }
             }
         )
     }

@@ -3,11 +3,8 @@ package com.salesinventory.app.util
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.os.Build
+import android.provider.Settings
 import java.io.IOException
 import java.io.OutputStream
 import java.util.*
@@ -16,9 +13,6 @@ object BluetoothPrinter {
 
     private var socket: BluetoothSocket? = null
     private var outputStream: OutputStream? = null
-    private var discoveryReceiver: BroadcastReceiver? = null
-
-    private val discoveredDevices = mutableListOf<Pair<String, String>>()
 
     // ESC/POS commands
     private const val ESC = 0x1B
@@ -138,60 +132,13 @@ object BluetoothPrinter {
         return write(*lines.toTypedArray())
     }
 
-    fun startDiscovery(context: Context, onDeviceFound: (Pair<String, String>) -> Unit, onFinished: () -> Unit) {
+    fun openBluetoothSettings(context: android.content.Context) {
         try {
-            stopDiscovery(context)
-            discoveredDevices.clear()
-            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
-            if (adapter.isDiscovering) adapter.cancelDiscovery()
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(ctx: Context, intent: Intent) {
-                    try {
-                        when (intent.action) {
-                            BluetoothDevice.ACTION_FOUND -> {
-                                val device = if (Build.VERSION.SDK_INT >= 33) {
-                                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
-                                } else {
-                                    @Suppress("DEPRECATION") intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                                }
-                                if (device != null && device.type != BluetoothDevice.DEVICE_TYPE_LE) {
-                                    val entry = device.address to (device.name.ifBlank { "Unknown" })
-                                    if (entry !in discoveredDevices) {
-                                        discoveredDevices.add(entry)
-                                        onDeviceFound(entry)
-                                    }
-                                }
-                            }
-                            BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
-                                onFinished()
-                            }
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
-            discoveryReceiver = receiver
-            val filter = IntentFilter().apply {
-                addAction(BluetoothDevice.ACTION_FOUND)
-                addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
-            }
-            if (Build.VERSION.SDK_INT >= 33) {
-                context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                @Suppress("DEPRECATION") context.registerReceiver(receiver, filter)
-            }
-            adapter.startDiscovery()
+            context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
         } catch (_: Exception) {}
     }
-
-    fun stopDiscovery(context: Context) {
-        try {
-            BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
-            discoveryReceiver?.let { context.unregisterReceiver(it) }
-        } catch (_: Exception) {}
-        discoveryReceiver = null
-    }
-
-    fun getDiscoveredDevices(): List<Pair<String, String>> = discoveredDevices.toList()
 
     fun disconnect() {
         try { outputStream?.close() } catch (_: Exception) {}
