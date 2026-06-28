@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import java.io.IOException
 import java.io.OutputStream
 import java.util.*
@@ -138,39 +139,55 @@ object BluetoothPrinter {
     }
 
     fun startDiscovery(context: Context, onDeviceFound: (Pair<String, String>) -> Unit, onFinished: () -> Unit) {
-        stopDiscovery(context)
-        discoveredDevices.clear()
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
-        discoveryReceiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context, intent: Intent) {
-                when (intent.action) {
-                    BluetoothDevice.ACTION_FOUND -> {
-                        val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                        if (device != null && device.type != BluetoothDevice.DEVICE_TYPE_LE) {
-                            val entry = device.address to (device.name.ifBlank { "Unknown" })
-                            if (entry !in discoveredDevices) {
-                                discoveredDevices.add(entry)
-                                onDeviceFound(entry)
+        try {
+            stopDiscovery(context)
+            discoveredDevices.clear()
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+            if (adapter.isDiscovering) adapter.cancelDiscovery()
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context, intent: Intent) {
+                    try {
+                        when (intent.action) {
+                            BluetoothDevice.ACTION_FOUND -> {
+                                val device = if (Build.VERSION.SDK_INT >= 33) {
+                                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                                } else {
+                                    @Suppress("DEPRECATION") intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                                }
+                                if (device != null && device.type != BluetoothDevice.DEVICE_TYPE_LE) {
+                                    val entry = device.address to (device.name.ifBlank { "Unknown" })
+                                    if (entry !in discoveredDevices) {
+                                        discoveredDevices.add(entry)
+                                        onDeviceFound(entry)
+                                    }
+                                }
+                            }
+                            BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
+                                onFinished()
                             }
                         }
-                    }
-                    BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
-                        onFinished()
-                    }
+                    } catch (_: Exception) {}
                 }
             }
-        }
-        val filter = IntentFilter().apply {
-            addAction(BluetoothDevice.ACTION_FOUND)
-            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
-        }
-        context.registerReceiver(discoveryReceiver, filter)
-        adapter.startDiscovery()
+            discoveryReceiver = receiver
+            val filter = IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_FOUND)
+                addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+            }
+            if (Build.VERSION.SDK_INT >= 33) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION") context.registerReceiver(receiver, filter)
+            }
+            adapter.startDiscovery()
+        } catch (_: Exception) {}
     }
 
     fun stopDiscovery(context: Context) {
-        BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
-        discoveryReceiver?.let { context.unregisterReceiver(it) }
+        try {
+            BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
+            discoveryReceiver?.let { context.unregisterReceiver(it) }
+        } catch (_: Exception) {}
         discoveryReceiver = null
     }
 
