@@ -75,6 +75,8 @@ fun ScanScreen(
     var showPrintDialog by remember { mutableStateOf(false) }
     var showPrinterPicker by remember { mutableStateOf(false) }
     var pairedPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var scanning by remember { mutableStateOf(false) }
+    var discoveredPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     val scope = rememberCoroutineScope()
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -499,30 +501,67 @@ fun ScanScreen(
         )
     }
 
-    if (showPrinterPicker && pairedPrinters.isNotEmpty()) {
+    if (showPrinterPicker) {
         AlertDialog(
-            onDismissRequest = { showPrinterPicker = false },
+            onDismissRequest = { showPrinterPicker = false; scanning = false; BluetoothPrinter.stopDiscovery(context) },
             title = { Text("Select Printer") },
             text = {
                 Column {
-                    pairedPrinters.forEach { (address, name) ->
-                        TextButton(
+                    if (scanning) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(8.dp))
+                        Text("Searching for nearby devices...", fontSize = 13.sp, color = Grey600)
+                    }
+                    val allPrinters = pairedPrinters + discoveredPrinters
+                    if (allPrinters.isNotEmpty()) {
+                        allPrinters.forEach { (address, name) ->
+                            TextButton(
+                                onClick = {
+                                    showPrinterPicker = false
+                                    scanning = false
+                                    BluetoothPrinter.stopDiscovery(context)
+                                    viewModel.printReceipt(lastTransactionId, address) { success ->
+                                        if (success) Toast.makeText(context, "Receipt printed", Toast.LENGTH_SHORT).show()
+                                        else Toast.makeText(context, "Print failed", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(name)
+                            }
+                        }
+                    } else if (!scanning) {
+                        Text("No printers found", fontSize = 13.sp, color = Grey600, modifier = Modifier.padding(8.dp))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (!scanning) {
+                        OutlinedButton(
                             onClick = {
-                                showPrinterPicker = false
-                                viewModel.printReceipt(lastTransactionId, address) { success ->
-                                    if (success) Toast.makeText(context, "Receipt printed", Toast.LENGTH_SHORT).show()
-                                    else Toast.makeText(context, "Print failed", Toast.LENGTH_SHORT).show()
-                                }
+                                scanning = true
+                                discoveredPrinters = emptyList()
+                                BluetoothPrinter.startDiscovery(
+                                    context,
+                                    onDeviceFound = { entry -> discoveredPrinters = discoveredPrinters + entry },
+                                    onFinished = { scanning = false }
+                                )
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(name)
+                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Search for nearby devices")
+                        }
+                    } else {
+                        TextButton(
+                            onClick = { scanning = false; BluetoothPrinter.stopDiscovery(context) }
+                        ) {
+                            Text("Stop search")
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showPrinterPicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showPrinterPicker = false; scanning = false; BluetoothPrinter.stopDiscovery(context) }) { Text("Cancel") }
             }
         )
     }

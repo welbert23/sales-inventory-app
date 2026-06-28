@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -36,6 +37,7 @@ fun BulkCheckoutScreen(
     val error by viewModel.error.collectAsState()
     val discount by viewModel.currentDiscount.collectAsState()
     val discounts by viewModel.discounts.collectAsState()
+    val context = LocalContext.current
 
     var cartItems by remember { mutableStateOf<List<CartItem>>(emptyList()) }
     var barcodeInput by remember { mutableStateOf("") }
@@ -50,6 +52,8 @@ fun BulkCheckoutScreen(
     var showPrintDialog by remember { mutableStateOf(false) }
     var showPrinterPicker by remember { mutableStateOf(false) }
     var pairedPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var scanning by remember { mutableStateOf(false) }
+    var discoveredPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
 
     fun addToCart(barcode: String) {
         val trimmed = barcode.trim()
@@ -417,30 +421,67 @@ fun BulkCheckoutScreen(
         )
     }
 
-    if (showPrinterPicker && pairedPrinters.isNotEmpty()) {
+    if (showPrinterPicker) {
         AlertDialog(
-            onDismissRequest = { showPrinterPicker = false },
+            onDismissRequest = { showPrinterPicker = false; scanning = false; BluetoothPrinter.stopDiscovery(context) },
             title = { Text("Select Printer") },
             text = {
                 Column {
-                    pairedPrinters.forEach { (address, name) ->
-                        TextButton(
+                    if (scanning) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(8.dp))
+                        Text("Searching for nearby devices...", fontSize = 13.sp, color = Grey600)
+                    }
+                    val allPrinters = pairedPrinters + discoveredPrinters
+                    if (allPrinters.isNotEmpty()) {
+                        allPrinters.forEach { (address, name) ->
+                            TextButton(
+                                onClick = {
+                                    showPrinterPicker = false
+                                    scanning = false
+                                    BluetoothPrinter.stopDiscovery(context)
+                                    viewModel.printReceipt(lastTransactionId, address) { success ->
+                                        if (success) localError = "Receipt printed"
+                                        else localError = "Print failed"
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(name)
+                            }
+                        }
+                    } else if (!scanning) {
+                        Text("No printers found", fontSize = 13.sp, color = Grey600, modifier = Modifier.padding(8.dp))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (!scanning) {
+                        OutlinedButton(
                             onClick = {
-                                showPrinterPicker = false
-                                viewModel.printReceipt(lastTransactionId, address) { success ->
-                                    if (success) localError = "Receipt printed"
-                                    else localError = "Print failed"
-                                }
+                                scanning = true
+                                discoveredPrinters = emptyList()
+                                BluetoothPrinter.startDiscovery(
+                                    context,
+                                    onDeviceFound = { entry -> discoveredPrinters = discoveredPrinters + entry },
+                                    onFinished = { scanning = false }
+                                )
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(name)
+                            Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Search for nearby devices")
+                        }
+                    } else {
+                        TextButton(
+                            onClick = { scanning = false; BluetoothPrinter.stopDiscovery(context) }
+                        ) {
+                            Text("Stop search")
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showPrinterPicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showPrinterPicker = false; scanning = false; BluetoothPrinter.stopDiscovery(context) }) { Text("Cancel") }
             }
         )
     }
