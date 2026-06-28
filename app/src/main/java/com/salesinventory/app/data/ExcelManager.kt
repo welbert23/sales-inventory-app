@@ -33,7 +33,7 @@ class ExcelManager(private val context: Context) {
 
     // ----- EXCEL DATA IMPORT (for migration) -----
 
-    fun importExcelToJson(appStorage: AppStorage) {
+    suspend fun importExcelToJson(appStorage: AppStorage) {
         try {
             val file = getFile()
             if (!file.exists()) return
@@ -49,7 +49,7 @@ class ExcelManager(private val context: Context) {
         } catch (_: Exception) {}
     }
 
-    private fun importInventorySheet(wb: XSSFWorkbook, storage: AppStorage) {
+    private suspend fun importInventorySheet(wb: XSSFWorkbook, storage: AppStorage) {
         val sheet = wb.getSheet(SHEET_INVENTORY) ?: return
         val h = getHeaderMap(sheet)
         if (h.isEmpty()) return
@@ -59,7 +59,7 @@ class ExcelManager(private val context: Context) {
         }
     }
 
-    private fun importSalesSheet(wb: XSSFWorkbook, storage: AppStorage) {
+    private suspend fun importSalesSheet(wb: XSSFWorkbook, storage: AppStorage) {
         val sheet = wb.getSheet(SHEET_SALES) ?: return
         val h = getHeaderMap(sheet)
         if (h.isEmpty()) return
@@ -69,7 +69,7 @@ class ExcelManager(private val context: Context) {
         }
     }
 
-    private fun importDiscountsSheet(wb: XSSFWorkbook, storage: AppStorage) {
+    private suspend fun importDiscountsSheet(wb: XSSFWorkbook, storage: AppStorage) {
         val sheet = wb.getSheet(SHEET_DISCOUNTS) ?: return
         val h = getHeaderMap(sheet)
         if (h.isEmpty()) return
@@ -79,7 +79,7 @@ class ExcelManager(private val context: Context) {
         }
     }
 
-    private fun importCustomersSheet(wb: XSSFWorkbook, storage: AppStorage) {
+    private suspend fun importCustomersSheet(wb: XSSFWorkbook, storage: AppStorage) {
         val sheet = wb.getSheet(SHEET_CUSTOMERS) ?: return
         val h = getHeaderMap(sheet)
         if (h.isEmpty()) return
@@ -89,7 +89,7 @@ class ExcelManager(private val context: Context) {
         }
     }
 
-    private fun importSuppliersSheet(wb: XSSFWorkbook, storage: AppStorage) {
+    private suspend fun importSuppliersSheet(wb: XSSFWorkbook, storage: AppStorage) {
         val sheet = wb.getSheet(SHEET_SUPPLIERS) ?: return
         val h = getHeaderMap(sheet)
         if (h.isEmpty()) return
@@ -99,7 +99,7 @@ class ExcelManager(private val context: Context) {
         }
     }
 
-    private fun importCreditPaymentsSheet(wb: XSSFWorkbook, storage: AppStorage) {
+    private suspend fun importCreditPaymentsSheet(wb: XSSFWorkbook, storage: AppStorage) {
         val sheet = wb.getSheet(SHEET_CREDIT_PAYMENTS) ?: return
         val h = getHeaderMap(sheet)
         if (h.isEmpty()) return
@@ -107,152 +107,6 @@ class ExcelManager(private val context: Context) {
             val row = sheet.getRow(i) ?: continue
             storage.recordCreditPayment(rowToCreditPayment(row, h))
         }
-    }
-
-    // ----- EXCEL EXPORT (from JSON to Excel for backup) -----
-
-    fun exportToExcel(appStorage: AppStorage): Uri? {
-        val wb = XSSFWorkbook()
-        exportInventorySheet(wb, appStorage)
-        exportSalesSheet(wb, appStorage)
-        exportDiscountsSheet(wb, appStorage)
-        exportCustomersSheet(wb, appStorage)
-        exportSuppliersSheet(wb, appStorage)
-        exportCreditPaymentsSheet(wb, appStorage)
-        return try {
-            val file = getFile()
-            wb.write(FileOutputStream(file))
-            Uri.fromFile(file)
-        } catch (_: Exception) { null }
-        finally { wb.close() }
-    }
-
-    private fun exportInventorySheet(wb: XSSFWorkbook, storage: AppStorage) {
-        val sheet = wb.createSheet(SHEET_INVENTORY)
-        val h = listOf("Barcode", "Product Name", "Category", "Price", "Cost Price", "Stock", "Unit", "Size", "Color", "Supplier ID", "Sub Label", "Min Stock", "Image URI")
-        h.forEachIndexed { i, it -> sheet.createRow(0).createCell(i).setCellValue(it) }
-        storage.getAllInventory().forEachIndexed { idx, item ->
-            val r = sheet.createRow(idx + 1)
-            r.createCell(0).setCellValue(item.barcode)
-            r.createCell(1).setCellValue(item.name)
-            r.createCell(2).setCellValue(item.category)
-            r.createCell(3).setCellValue(item.price)
-            r.createCell(4).setCellValue(item.costPrice)
-            r.createCell(5).setCellValue(item.stock.toDouble())
-            r.createCell(6).setCellValue(item.unit)
-            r.createCell(7).setCellValue(item.size)
-            r.createCell(8).setCellValue(item.color)
-            r.createCell(9).setCellValue(item.supplierId)
-            r.createCell(10).setCellValue(item.subLabel)
-            r.createCell(11).setCellValue(item.minStock.toDouble())
-            r.createCell(12).setCellValue(item.imageUri)
-        }
-    }
-
-    private fun exportSalesSheet(wb: XSSFWorkbook, storage: AppStorage) {
-        val sheet = wb.createSheet(SHEET_SALES)
-        val h = listOf("ID", "Date", "Barcode", "Product Name", "Quantity", "Unit Price", "Cost Price", "Disc%", "Disc Amt", "Subtotal", "Total", "Customer ID", "Payment Type", "Is Credit", "Transaction ID")
-        h.forEachIndexed { i, it -> sheet.createRow(0).createCell(i).setCellValue(it) }
-        storage.getAllSales().forEachIndexed { idx, s ->
-            val r = sheet.createRow(idx + 1)
-            r.createCell(0).setCellValue(s.id)
-            r.createCell(1).setCellValue(s.date)
-            r.createCell(2).setCellValue(s.barcode)
-            r.createCell(3).setCellValue(s.productName)
-            r.createCell(4).setCellValue(s.quantity.toDouble())
-            r.createCell(5).setCellValue(s.unitPrice)
-            r.createCell(6).setCellValue(s.costPrice)
-            r.createCell(7).setCellValue(s.discountPercent)
-            r.createCell(8).setCellValue(s.discountAmount)
-            r.createCell(9).setCellValue(s.subtotal)
-            r.createCell(10).setCellValue(s.total)
-            r.createCell(11).setCellValue(s.customerId)
-            r.createCell(12).setCellValue(s.paymentType.name)
-            r.createCell(13).setCellValue(if (s.isCredit) "Y" else "N")
-            r.createCell(14).setCellValue(s.transactionId)
-        }
-    }
-
-    private fun exportDiscountsSheet(wb: XSSFWorkbook, storage: AppStorage) {
-        val sheet = wb.createSheet(SHEET_DISCOUNTS)
-        val h = listOf("ID", "Name", "Type (P=Percent/F=Fixed)", "Value", "Active (Y/N)")
-        h.forEachIndexed { i, it -> sheet.createRow(0).createCell(i).setCellValue(it) }
-        storage.getDiscounts().forEachIndexed { idx, d ->
-            val r = sheet.createRow(idx + 1)
-            r.createCell(0).setCellValue(d.id)
-            r.createCell(1).setCellValue(d.name)
-            r.createCell(2).setCellValue(if (d.type == DiscountType.FIXED_AMOUNT) "F" else "P")
-            r.createCell(3).setCellValue(d.value)
-            r.createCell(4).setCellValue(if (d.isActive) "Y" else "N")
-        }
-    }
-
-    private fun exportCustomersSheet(wb: XSSFWorkbook, storage: AppStorage) {
-        val sheet = wb.createSheet(SHEET_CUSTOMERS)
-        val h = listOf("ID", "Name", "Phone", "Email", "Address", "Credit Balance", "Total Purchases", "Notes")
-        h.forEachIndexed { i, it -> sheet.createRow(0).createCell(i).setCellValue(it) }
-        storage.getAllCustomers().forEachIndexed { idx, c ->
-            val r = sheet.createRow(idx + 1)
-            r.createCell(0).setCellValue(c.id)
-            r.createCell(1).setCellValue(c.name)
-            r.createCell(2).setCellValue(c.phone)
-            r.createCell(3).setCellValue(c.email)
-            r.createCell(4).setCellValue(c.address)
-            r.createCell(5).setCellValue(c.creditBalance)
-            r.createCell(6).setCellValue(c.totalPurchases)
-            r.createCell(7).setCellValue(c.notes)
-        }
-    }
-
-    private fun exportSuppliersSheet(wb: XSSFWorkbook, storage: AppStorage) {
-        val sheet = wb.createSheet(SHEET_SUPPLIERS)
-        val h = listOf("ID", "Name", "Contact Person", "Phone", "Email", "Address", "Notes")
-        h.forEachIndexed { i, it -> sheet.createRow(0).createCell(i).setCellValue(it) }
-        storage.getAllSuppliers().forEachIndexed { idx, s ->
-            val r = sheet.createRow(idx + 1)
-            r.createCell(0).setCellValue(s.id)
-            r.createCell(1).setCellValue(s.name)
-            r.createCell(2).setCellValue(s.contactPerson)
-            r.createCell(3).setCellValue(s.phone)
-            r.createCell(4).setCellValue(s.email)
-            r.createCell(5).setCellValue(s.address)
-            r.createCell(6).setCellValue(s.notes)
-        }
-    }
-
-    private fun exportCreditPaymentsSheet(wb: XSSFWorkbook, storage: AppStorage) {
-        val sheet = wb.createSheet(SHEET_CREDIT_PAYMENTS)
-        val h = listOf("ID", "Customer ID", "Amount", "Date", "Notes")
-        h.forEachIndexed { i, it -> sheet.createRow(0).createCell(i).setCellValue(it) }
-        storage.getAllCreditPayments().forEachIndexed { idx, p ->
-            val r = sheet.createRow(idx + 1)
-            r.createCell(0).setCellValue(p.id)
-            r.createCell(1).setCellValue(p.customerId)
-            r.createCell(2).setCellValue(p.amount)
-            r.createCell(3).setCellValue(p.date)
-            r.createCell(4).setCellValue(p.notes)
-        }
-    }
-
-    // ----- IMPORT EXCEL FILE (user-initiated) -----
-
-    fun importInventoryFromUri(uri: Uri): Int {
-        return try {
-            val inputStream = context.contentResolver.openInputStream(uri) ?: return 0
-            val importWb = XSSFWorkbook(inputStream)
-            val sheet = importWb.getSheet(SHEET_INVENTORY) ?: return 0
-            val h = getHeaderMap(sheet)
-            if (h.isEmpty()) { importWb.close(); inputStream.close(); return 0 }
-            val items = mutableListOf<InventoryItem>()
-            for (i in 1..sheet.lastRowNum) {
-                val row = sheet.getRow(i) ?: continue
-                val item = rowToInventory(row, h)
-                if (item.barcode.isNotBlank() && item.name.isNotBlank()) items.add(item)
-            }
-            importWb.close()
-            inputStream.close()
-            items.size
-        } catch (e: Exception) { 0 }
     }
 
     // ----- FILE HELPERS -----

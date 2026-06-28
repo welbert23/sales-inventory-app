@@ -444,22 +444,24 @@ fun BulkCheckoutScreen(
         )
     }
 
-    if (localError != null) {
+    val localErr = localError
+    if (localErr != null) {
         AlertDialog(
             onDismissRequest = { localError = null },
             title = { Text("Error") },
-            text = { Text(localError!!) },
+            text = { Text(localErr) },
             confirmButton = {
                 TextButton(onClick = { localError = null }) { Text("OK") }
             }
         )
     }
 
-    if (error != null) {
+    val errMsg = error
+    if (errMsg != null) {
         AlertDialog(
             onDismissRequest = { viewModel.clearError() },
             title = { Text("Notice") },
-            text = { Text(error!!) },
+            text = { Text(errMsg) },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearError() }) { Text("OK") }
             }

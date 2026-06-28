@@ -7,6 +7,7 @@ import com.salesinventory.app.data.*
 import com.salesinventory.app.util.PdfExporter
 import com.salesinventory.app.util.ReceiptItem
 import com.salesinventory.app.util.BluetoothPrinter
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,20 +40,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentDiscount = MutableStateFlow<Discount?>(null)
     val currentDiscount: StateFlow<Discount?> = _currentDiscount.asStateFlow()
 
-    private val _scanResult = MutableStateFlow<InventoryItem?>(null)
-    val scanResult: StateFlow<InventoryItem?> = _scanResult.asStateFlow()
-
-    private val _saleQuantity = MutableStateFlow(1)
-    val saleQuantity: StateFlow<Int> = _saleQuantity.asStateFlow()
-
-    private val _saleComplete = MutableStateFlow(false)
-    val saleComplete: StateFlow<Boolean> = _saleComplete.asStateFlow()
-
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
-
-    private val _lastScannedBarcode = MutableStateFlow("")
-    val lastScannedBarcode: StateFlow<String> = _lastScannedBarcode.asStateFlow()
 
     private val _todaySalesTotal = MutableStateFlow(0.0)
     val todaySalesTotal: StateFlow<Double> = _todaySalesTotal.asStateFlow()
@@ -62,6 +51,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _lowStockItems = MutableStateFlow<List<InventoryItem>>(emptyList())
     val lowStockItems: StateFlow<List<InventoryItem>> = _lowStockItems.asStateFlow()
+
+    private val _customerPayments = MutableStateFlow<List<CreditPayment>>(emptyList())
+    val customerPayments: StateFlow<List<CreditPayment>> = _customerPayments.asStateFlow()
 
     init {
         loadData()
@@ -100,76 +92,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return _sales.value.filter { it.date.startsWith(today) }
     }
 
-    fun setScanResult(item: InventoryItem?) {
-        _scanResult.value = item
-        _saleQuantity.value = 1
-        _saleComplete.value = false
-    }
-
-    fun setSaleQuantity(qty: Int) {
-        _saleQuantity.value = if (qty < 1) 1 else qty
-    }
-
-    fun setLastScannedBarcode(barcode: String) {
-        _lastScannedBarcode.value = barcode
-    }
-
     fun setCurrentDiscount(discount: Discount?) {
         _currentDiscount.value = discount
     }
 
-    fun processSale(barcode: String, quantity: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val item = appStorage.getItemByBarcode(barcode)
-                if (item == null) {
-                    _error.value = "Item not found: $barcode"
-                    return@launch
-                }
-                if (item.stock < quantity) {
-                    _error.value = "Insufficient stock! Available: ${item.stock}"
-                    return@launch
-                }
-
-                val discount = _currentDiscount.value
-                val unitPrice = item.price
-                val subtotal = unitPrice * quantity
-                val discountAmt = if (discount != null && discount.isActive) {
-                    when (discount.type) {
-                        DiscountType.PERCENTAGE -> subtotal * discount.value / 100.0
-                        DiscountType.FIXED_AMOUNT -> discount.value * quantity
-                    }
-                } else 0.0
-                val total = subtotal - discountAmt
-                val discPct = if (discount != null && discount.isActive) discount.value else 0.0
-
-                val sale = SaleRecord(
-                    id = UUID.randomUUID().toString().take(8),
-                    date = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
-                    barcode = item.barcode,
-                    productName = item.name,
-                    quantity = quantity,
-                    unitPrice = unitPrice,
-                    costPrice = item.costPrice,
-                    discountPercent = discPct,
-                    discountAmount = discountAmt,
-                    subtotal = subtotal,
-                    total = total
-                )
-
-                appStorage.recordSale(sale)
-                appStorage.updateStock(barcode, item.stock - quantity)
-                _sales.value = appStorage.getAllSales()
-                _inventory.value = appStorage.getAllInventory()
-                _saleComplete.value = true
-                updateStats()
-            } catch (e: Exception) {
-                _error.value = "Error processing sale: ${e.message}"
-            }
-        }
-    }
-
     fun addInventoryItem(item: InventoryItem) {
+        if (item.price < 0) { _error.value = "Price cannot be negative"; return }
+        if (item.stock < 0) { _error.value = "Stock cannot be negative"; return }
         val current = _inventory.value.toMutableList()
         val idx = current.indexOfFirst { it.barcode == item.barcode }
         if (idx >= 0) current[idx] = item else current.add(item)
@@ -180,20 +109,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 appStorage.addOrUpdateInventory(item)
             } catch (e: Exception) {
                 _error.value = "Error saving item: ${e.message}"
-            }
-        }
-    }
-
-    fun importInventoryItems(uri: android.net.Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val count = excelManager.importInventoryFromUri(uri)
-                _inventory.value = appStorage.getAllInventory()
-                updateStats()
-                if (count > 0) _error.value = "Imported $count items successfully"
-                else _error.value = "No items found to import"
-            } catch (e: Exception) {
-                _error.value = "Error importing: ${e.message}"
             }
         }
     }
@@ -213,6 +128,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addDiscount(discount: Discount) {
+        if (discount.type == DiscountType.PERCENTAGE && discount.value > 100) {
+            _error.value = "Percentage discount cannot exceed 100%"
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 appStorage.addOrUpdateDiscount(discount)
@@ -326,7 +245,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun processBulkSale(items: List<CartItem>, customerId: String = "", customerType: String = "", paymentType: PaymentType = PaymentType.CASH, isCredit: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val transactionId = UUID.randomUUID().toString().take(8)
+                val transactionId = UUID.randomUUID().toString()
                 val discount = _currentDiscount.value
                 for (cart in items) {
                     val item = appStorage.getItemByBarcode(cart.barcode)
@@ -342,10 +261,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     } else 0.0
                     val discPct = if (discount != null && discount.isActive) discount.value else 0.0
-                    val total = subtotal - discountAmt
+                    val total = maxOf(0.0, subtotal - discountAmt)
 
                     val sale = SaleRecord(
-                        id = UUID.randomUUID().toString().take(8),
+                        id = UUID.randomUUID().toString(),
                         date = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
                         barcode = item.barcode,
                         productName = item.name,
@@ -448,6 +367,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 appStorage.recordCreditPayment(payment)
+                val customer = appStorage.getCustomerById(payment.customerId)
+                if (customer != null) {
+                    appStorage.addOrUpdateCustomer(
+                        customer.copy(creditBalance = maxOf(0.0, customer.creditBalance - payment.amount))
+                    )
+                }
                 _customers.value = appStorage.getAllCustomers()
             } catch (e: Exception) {
                 _error.value = "Error recording payment: ${e.message}"
@@ -455,8 +380,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun getCustomerPayments(customerId: String): List<CreditPayment> {
-        return appStorage.getPaymentsByCustomer(customerId)
+    fun loadCustomerPayments(customerId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _customerPayments.value = appStorage.getPaymentsByCustomer(customerId)
+        }
     }
 
     // ----- PDF EXPORT -----
@@ -516,26 +443,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 callback(false)
             }
         }
-    }
-
-    fun printBarcodeLabel(barcode: String, address: String, callback: (Boolean) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val item = appStorage.getItemByBarcode(barcode)
-                if (item == null) { callback(false); return@launch }
-                val connected = BluetoothPrinter.connect(address)
-                if (!connected) { callback(false); return@launch }
-                val result = BluetoothPrinter.printBarcodeLabel(barcode, item.name, item.price)
-                BluetoothPrinter.disconnect()
-                callback(result)
-            } catch (e: Exception) {
-                callback(false)
-            }
-        }
-    }
-
-    fun getBluetoothPrinters(): List<Pair<String, String>> {
-        return BluetoothPrinter.getPairedPrinters()
     }
 
     // ----- BACKUP -----

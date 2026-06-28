@@ -4,10 +4,13 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.File
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class AppStorage(private val context: Context) {
 
     private val gson = Gson()
+    private val mutex = Mutex()
 
     private val inventoryFile get() = File(context.filesDir, "inventory.json")
     private val salesFile get() = File(context.filesDir, "sales.json")
@@ -25,141 +28,140 @@ class AppStorage(private val context: Context) {
     }
 
     private fun <T> writeList(file: File, list: List<T>) {
-        file.writeText(gson.toJson(list))
+        val tmp = File(file.absolutePath + ".tmp")
+        tmp.writeText(gson.toJson(list))
+        tmp.renameTo(file)
     }
 
-    fun getAllInventory(): List<InventoryItem> {
+    private suspend fun <T> synchronizedRead(file: File, type: java.lang.reflect.Type): List<T> =
+        mutex.withLock { readList(file, type) }
+
+    private suspend fun <T> synchronizedWrite(file: File, list: List<T>) =
+        mutex.withLock { writeList(file, list) }
+
+    suspend fun getAllInventory(): List<InventoryItem> {
         val type = object : TypeToken<List<InventoryItem>>() {}.type
-        return readList(inventoryFile, type)
+        return synchronizedRead(inventoryFile, type)
     }
 
-    fun addOrUpdateInventory(item: InventoryItem) {
+    suspend fun addOrUpdateInventory(item: InventoryItem) {
         val type = object : TypeToken<List<InventoryItem>>() {}.type
-        val list = readList<InventoryItem>(inventoryFile, type).toMutableList()
+        val list = synchronizedRead<InventoryItem>(inventoryFile, type).toMutableList()
         val idx = list.indexOfFirst { it.barcode == item.barcode }
         if (idx >= 0) list[idx] = item else list.add(item)
-        writeList(inventoryFile, list)
+        synchronizedWrite(inventoryFile, list)
     }
 
-    fun removeInventoryItem(barcode: String) {
+    suspend fun removeInventoryItem(barcode: String) {
         val type = object : TypeToken<List<InventoryItem>>() {}.type
-        val list = readList<InventoryItem>(inventoryFile, type).toMutableList()
+        val list = synchronizedRead<InventoryItem>(inventoryFile, type).toMutableList()
         list.removeAll { it.barcode == barcode }
-        writeList(inventoryFile, list)
+        synchronizedWrite(inventoryFile, list)
     }
 
-    fun getItemByBarcode(barcode: String): InventoryItem? {
+    suspend fun getItemByBarcode(barcode: String): InventoryItem? {
         return getAllInventory().find { it.barcode == barcode }
     }
 
-    fun updateStock(barcode: String, newStock: Int) {
+    suspend fun updateStock(barcode: String, newStock: Int) {
         val type = object : TypeToken<List<InventoryItem>>() {}.type
-        val list = readList<InventoryItem>(inventoryFile, type).toMutableList()
+        val list = synchronizedRead<InventoryItem>(inventoryFile, type).toMutableList()
         val idx = list.indexOfFirst { it.barcode == barcode }
         if (idx >= 0) {
             list[idx] = list[idx].copy(stock = newStock)
-            writeList(inventoryFile, list)
+            synchronizedWrite(inventoryFile, list)
         }
     }
 
-    fun getAllSales(): List<SaleRecord> {
+    suspend fun getAllSales(): List<SaleRecord> {
         val type = object : TypeToken<List<SaleRecord>>() {}.type
-        return readList(salesFile, type)
+        return synchronizedRead(salesFile, type)
     }
 
-    fun recordSale(sale: SaleRecord) {
+    suspend fun recordSale(sale: SaleRecord) {
         val type = object : TypeToken<List<SaleRecord>>() {}.type
-        val list = readList<SaleRecord>(salesFile, type).toMutableList()
+        val list = synchronizedRead<SaleRecord>(salesFile, type).toMutableList()
         list.add(sale)
-        writeList(salesFile, list)
+        synchronizedWrite(salesFile, list)
     }
 
-    fun getDiscounts(): List<Discount> {
+    suspend fun getDiscounts(): List<Discount> {
         val type = object : TypeToken<List<Discount>>() {}.type
-        return readList(discountsFile, type)
+        return synchronizedRead(discountsFile, type)
     }
 
-    fun addOrUpdateDiscount(discount: Discount) {
+    suspend fun addOrUpdateDiscount(discount: Discount) {
         val type = object : TypeToken<List<Discount>>() {}.type
-        val list = readList<Discount>(discountsFile, type).toMutableList()
+        val list = synchronizedRead<Discount>(discountsFile, type).toMutableList()
         val idx = list.indexOfFirst { it.id == discount.id }
         if (idx >= 0) list[idx] = discount else list.add(discount)
-        writeList(discountsFile, list)
+        synchronizedWrite(discountsFile, list)
     }
 
-    fun removeDiscount(id: String) {
+    suspend fun removeDiscount(id: String) {
         val type = object : TypeToken<List<Discount>>() {}.type
-        val list = readList<Discount>(discountsFile, type).toMutableList()
+        val list = synchronizedRead<Discount>(discountsFile, type).toMutableList()
         list.removeAll { it.id == id }
-        writeList(discountsFile, list)
+        synchronizedWrite(discountsFile, list)
     }
 
-    fun getAllCustomers(): List<Customer> {
+    suspend fun getAllCustomers(): List<Customer> {
         val type = object : TypeToken<List<Customer>>() {}.type
-        return readList(customersFile, type)
+        return synchronizedRead(customersFile, type)
     }
 
-    fun getCustomerById(id: String): Customer? {
+    suspend fun getCustomerById(id: String): Customer? {
         return getAllCustomers().find { it.id == id }
     }
 
-    fun addOrUpdateCustomer(customer: Customer) {
+    suspend fun addOrUpdateCustomer(customer: Customer) {
         val type = object : TypeToken<List<Customer>>() {}.type
-        val list = readList<Customer>(customersFile, type).toMutableList()
+        val list = synchronizedRead<Customer>(customersFile, type).toMutableList()
         val idx = list.indexOfFirst { it.id == customer.id }
         if (idx >= 0) list[idx] = customer else list.add(customer)
-        writeList(customersFile, list)
+        synchronizedWrite(customersFile, list)
     }
 
-    fun removeCustomer(id: String) {
+    suspend fun removeCustomer(id: String) {
         val type = object : TypeToken<List<Customer>>() {}.type
-        val list = readList<Customer>(customersFile, type).toMutableList()
+        val list = synchronizedRead<Customer>(customersFile, type).toMutableList()
         list.removeAll { it.id == id }
-        writeList(customersFile, list)
+        synchronizedWrite(customersFile, list)
     }
 
-    fun getAllSuppliers(): List<Supplier> {
+    suspend fun getAllSuppliers(): List<Supplier> {
         val type = object : TypeToken<List<Supplier>>() {}.type
-        return readList(suppliersFile, type)
+        return synchronizedRead(suppliersFile, type)
     }
 
-    fun addOrUpdateSupplier(supplier: Supplier) {
+    suspend fun addOrUpdateSupplier(supplier: Supplier) {
         val type = object : TypeToken<List<Supplier>>() {}.type
-        val list = readList<Supplier>(suppliersFile, type).toMutableList()
+        val list = synchronizedRead<Supplier>(suppliersFile, type).toMutableList()
         val idx = list.indexOfFirst { it.id == supplier.id }
         if (idx >= 0) list[idx] = supplier else list.add(supplier)
-        writeList(suppliersFile, list)
+        synchronizedWrite(suppliersFile, list)
     }
 
-    fun removeSupplier(id: String) {
+    suspend fun removeSupplier(id: String) {
         val type = object : TypeToken<List<Supplier>>() {}.type
-        val list = readList<Supplier>(suppliersFile, type).toMutableList()
+        val list = synchronizedRead<Supplier>(suppliersFile, type).toMutableList()
         list.removeAll { it.id == id }
-        writeList(suppliersFile, list)
+        synchronizedWrite(suppliersFile, list)
     }
 
-    fun recordCreditPayment(payment: CreditPayment) {
+    suspend fun recordCreditPayment(payment: CreditPayment) {
         val type = object : TypeToken<List<CreditPayment>>() {}.type
-        val list = readList<CreditPayment>(creditPaymentsFile, type).toMutableList()
+        val list = synchronizedRead<CreditPayment>(creditPaymentsFile, type).toMutableList()
         list.add(payment)
-        writeList(creditPaymentsFile, list)
+        synchronizedWrite(creditPaymentsFile, list)
     }
 
-    fun getAllCreditPayments(): List<CreditPayment> {
+    suspend fun getAllCreditPayments(): List<CreditPayment> {
         val type = object : TypeToken<List<CreditPayment>>() {}.type
-        return readList(creditPaymentsFile, type)
+        return synchronizedRead(creditPaymentsFile, type)
     }
 
-    fun getPaymentsByCustomer(customerId: String): List<CreditPayment> {
+    suspend fun getPaymentsByCustomer(customerId: String): List<CreditPayment> {
         return getAllCreditPayments().filter { it.customerId == customerId }
-    }
-
-    fun clearAll() {
-        inventoryFile.delete()
-        salesFile.delete()
-        discountsFile.delete()
-        customersFile.delete()
-        suppliersFile.delete()
-        creditPaymentsFile.delete()
     }
 }

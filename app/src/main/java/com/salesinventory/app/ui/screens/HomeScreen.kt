@@ -374,8 +374,9 @@ fun HomeScreen(
 
                         Spacer(Modifier.height(8.dp))
 
-                        if (comparisonData != null && comparisonData!!.comparisons.isNotEmpty()) {
-                            val comps = comparisonData!!.comparisons
+                        val compData = comparisonData
+                        if (compData != null && compData.comparisons.isNotEmpty()) {
+                            val comps = compData.comparisons
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = Blue50),
                                 shape = RoundedCornerShape(10.dp)

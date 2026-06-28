@@ -20,6 +20,7 @@ import com.salesinventory.app.data.CreditPayment
 import com.salesinventory.app.data.Customer
 import com.salesinventory.app.ui.theme.*
 import com.salesinventory.app.viewmodel.MainViewModel
+import androidx.compose.material3.AlertDialog
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -36,6 +37,7 @@ fun CustomerScreen(
     var showPaymentDialog by remember { mutableStateOf<Customer?>(null) }
     var showPaymentHistory by remember { mutableStateOf<Customer?>(null) }
     var editingCustomer by remember { mutableStateOf<Customer?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -150,7 +152,7 @@ fun CustomerScreen(
                 showAddDialog = false
                 editingCustomer = null
             },
-            onDelete = if (editingCustomer != null) {{ viewModel.removeCustomer(editingCustomer!!.id); showAddDialog = false; editingCustomer = null }} else null
+            onDelete = editingCustomer?.let { { showDeleteConfirm = true } }
         )
     }
 
@@ -172,19 +174,46 @@ fun CustomerScreen(
         )
     }
 
+    if (showDeleteConfirm) {
+        val cust = editingCustomer
+        if (cust != null) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text("Confirm Delete") },
+                text = { Text("Delete customer \"${cust.name}\"? All data will be lost.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.removeCustomer(cust.id)
+                        showDeleteConfirm = false
+                        showAddDialog = false
+                        editingCustomer = null
+                    }) { Text("Delete", color = Red700) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                }
+            )
+        }
+    }
+
     showPaymentHistory?.let { customer ->
+        LaunchedEffect(customer.id) {
+            viewModel.loadCustomerPayments(customer.id)
+        }
+        val payments by viewModel.customerPayments.collectAsState()
         PaymentHistoryDialog(
             customer = customer,
-            payments = viewModel.getCustomerPayments(customer.id),
+            payments = payments,
             onDismiss = { showPaymentHistory = null }
         )
     }
 
-    if (error != null) {
+    val errMsg = error
+    if (errMsg != null) {
         AlertDialog(
             onDismissRequest = { viewModel.clearError() },
             title = { Text("Error") },
-            text = { Text(error!!) },
+            text = { Text(errMsg) },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearError() }) { Text("OK") }
             }

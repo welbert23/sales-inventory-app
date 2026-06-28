@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import com.salesinventory.app.data.Supplier
 import com.salesinventory.app.ui.theme.*
 import com.salesinventory.app.viewmodel.MainViewModel
+import androidx.compose.material3.AlertDialog
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +33,7 @@ fun SupplierScreen(
 
     var showDialog by remember { mutableStateOf(false) }
     var editingSupplier by remember { mutableStateOf<Supplier?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -124,15 +126,38 @@ fun SupplierScreen(
                 showDialog = false
                 editingSupplier = null
             },
-            onDelete = if (editingSupplier != null) {{ viewModel.removeSupplier(editingSupplier!!.id); showDialog = false; editingSupplier = null }} else null
+            onDelete = editingSupplier?.let { { showDeleteConfirm = true } }
         )
     }
 
-    if (error != null) {
+    if (showDeleteConfirm) {
+        val supp = editingSupplier
+        if (supp != null) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text("Confirm Delete") },
+                text = { Text("Delete supplier \"${supp.name}\"?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.removeSupplier(supp.id)
+                        showDeleteConfirm = false
+                        showDialog = false
+                        editingSupplier = null
+                    }) { Text("Delete", color = Red700) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                }
+            )
+        }
+    }
+
+    val errMsg = error
+    if (errMsg != null) {
         AlertDialog(
             onDismissRequest = { viewModel.clearError() },
             title = { Text("Error") },
-            text = { Text(error!!) },
+            text = { Text(errMsg) },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearError() }) { Text("OK") }
             }

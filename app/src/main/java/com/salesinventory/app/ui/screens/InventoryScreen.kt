@@ -121,11 +121,28 @@ fun InventoryScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredItems, key = { it.barcode }) { item ->
+                        var showDeleteConfirm by remember { mutableStateOf(false) }
                         InventoryItemCard(
                             item = item,
                             onEdit = { editItem = item },
-                            onDelete = { viewModel.removeInventoryItem(item.barcode) }
+                            onDelete = { showDeleteConfirm = true }
                         )
+                        if (showDeleteConfirm) {
+                            AlertDialog(
+                                onDismissRequest = { showDeleteConfirm = false },
+                                title = { Text("Confirm Delete") },
+                                text = { Text("Delete \"${item.name}\" from inventory?") },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        viewModel.removeInventoryItem(item.barcode)
+                                        showDeleteConfirm = false
+                                    }) { Text("Delete", color = Red700) }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -142,22 +159,23 @@ fun InventoryScreen(
         )
     }
 
-    if (editItem != null) {
+    editItem?.let { item ->
         EditItemDialog(
-            item = editItem!!,
+            item = item,
             onDismiss = { editItem = null },
-            onSave = { item ->
-                viewModel.addInventoryItem(item)
+            onSave = { i ->
+                viewModel.addInventoryItem(i)
                 editItem = null
             }
         )
     }
 
-    if (error != null) {
+    val errMsg = error
+    if (errMsg != null) {
         AlertDialog(
             onDismissRequest = { viewModel.clearError() },
             title = { Text("Error") },
-            text = { Text(error!!) },
+            text = { Text(errMsg) },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearError() }) { Text("OK") }
             }

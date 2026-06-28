@@ -67,11 +67,14 @@ fun DiscountScreen(
                     ) {
                         Icon(Icons.Filled.LocalOffer, contentDescription = null, tint = Amber700)
                         Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Active: ${currentDiscount!!.name}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            val desc = if (currentDiscount!!.type == DiscountType.PERCENTAGE)
-                                "${currentDiscount!!.value}% OFF" else "PHP ${currentDiscount!!.value} OFF"
-                            Text(desc, color = Amber700, fontSize = 13.sp)
+                        val d = currentDiscount
+                        if (d != null) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Active: ${d.name}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                val desc = if (d.type == DiscountType.PERCENTAGE)
+                                    "${d.value}% OFF" else "PHP ${d.value} OFF"
+                                Text(desc, color = Amber700, fontSize = 13.sp)
+                            }
                         }
                         Button(
                             onClick = { viewModel.setCurrentDiscount(null) },
@@ -109,12 +112,29 @@ fun DiscountScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(discounts, key = { it.id }) { discount ->
+                        var showDeleteConfirm by remember { mutableStateOf(false) }
                         DiscountCard(
                             discount = discount,
                             isActive = currentDiscount?.id == discount.id,
                             onActivate = { viewModel.setCurrentDiscount(discount) },
-                            onDelete = { viewModel.removeDiscount(discount.id) }
+                            onDelete = { showDeleteConfirm = true }
                         )
+                        if (showDeleteConfirm) {
+                            AlertDialog(
+                                onDismissRequest = { showDeleteConfirm = false },
+                                title = { Text("Confirm Delete") },
+                                text = { Text("Delete discount \"${discount.name}\"?") },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        viewModel.removeDiscount(discount.id)
+                                        showDeleteConfirm = false
+                                    }) { Text("Delete", color = Red700) }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -234,7 +254,8 @@ private fun AddDiscountDialog(
             Button(
                 onClick = {
                     val valNum = value.toDoubleOrNull() ?: 0.0
-                    if (name.isNotBlank() && valNum > 0) {
+                    val isPercent = typeIndex == 0
+                    if (name.isNotBlank() && valNum > 0 && (!isPercent || valNum <= 100)) {
                         val discount = Discount(
                             id = UUID.randomUUID().toString().take(8),
                             name = name.trim(),
@@ -245,7 +266,10 @@ private fun AddDiscountDialog(
                         onSave(discount)
                     }
                 },
-                enabled = name.isNotBlank() && (value.toDoubleOrNull() ?: 0.0) > 0,
+                enabled = name.isNotBlank() && {
+                    val v = value.toDoubleOrNull() ?: 0.0
+                    v > 0 && (typeIndex != 0 || v <= 100)
+                }(),
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text("Save")

@@ -92,14 +92,6 @@ data class CreditPayment(
     val date: String = "",
     val notes: String = ""
 )
-
-sealed class UiState<out T> {
-    data object Idle : UiState<Nothing>()
-    data object Loading : UiState<Nothing>()
-    data class Success<T>(val data: T) : UiState<T>()
-    data class Error(val message: String) : UiState<Nothing>()
-}
-
 enum class ComparePeriod { DAY, WEEK, MONTH, YEAR }
 
 data class PeriodSummary(

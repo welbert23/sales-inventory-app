@@ -81,16 +81,6 @@ object BluetoothPrinter {
         return printText(sb.toString())
     }
 
-    fun printBarcodeLabel(barcode: String, productName: String, price: Double): Boolean {
-        val sb = StringBuilder()
-        sb.append("\n")
-        sb.append("$productName\n")
-        sb.append("Price: PHP ${"%.2f".format(price)}\n")
-        sb.append("Barcode: $barcode\n")
-        sb.append("\n")
-        return printText(sb.toString())
-    }
-
     fun disconnect() {
         try { outputStream?.close() } catch (_: Exception) {}
         try { socket?.close() } catch (_: Exception) {}

@@ -137,6 +137,8 @@ fun ScanScreen(
         Column(
             modifier = Modifier.fillMaxSize().padding(padding)
         ) {
+            val capturedItem = currentItem
+            val capturedLookup = lookupResult
             if (!hasCameraPermission) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -263,86 +265,86 @@ fun ScanScreen(
                         }
                     }
                 }
-            } else if (currentItem != null) {
-                SaleForm(
-                    item = currentItem!!,
-                    quantity = saleQty,
-                    cartItems = cartItems,
-                    discount = discount,
-                    discounts = discounts,
-                    onSelectDiscount = { viewModel.setCurrentDiscount(it) },
-                    onQuantityChange = { saleQty = it.coerceIn(1, currentItem!!.stock) },
-                    onConfirm = {
-                        val allItems = cartItems + CartItem(
-                            barcode = currentItem!!.barcode,
-                            productName = currentItem!!.name,
-                            quantity = saleQty,
-                            unitPrice = currentItem!!.price,
-                            costPrice = currentItem!!.costPrice
-                        )
-                        viewModel.processBulkSale(allItems, "", "Walk-in", PaymentType.CASH, false)
-                        cartItems = emptyList()
-                        currentItem = null
-                        isScanning = true
-                    },
-                    onCancel = {
-                        currentItem = null
-                        isScanning = true
-                    },
-                    onAddAnother = {
-                        cartItems = cartItems + CartItem(
-                            barcode = currentItem!!.barcode,
-                            productName = currentItem!!.name,
-                            quantity = saleQty,
-                            unitPrice = currentItem!!.price,
-                            costPrice = currentItem!!.costPrice
-                        )
-                        currentItem = null
-                        isScanning = true
-                        saleQty = 1
-                    }
-                )
+            } else if (capturedItem != null) {
+                    SaleForm(
+                        item = capturedItem,
+                        quantity = saleQty,
+                        cartItems = cartItems,
+                        discount = discount,
+                        discounts = discounts,
+                        onSelectDiscount = { viewModel.setCurrentDiscount(it) },
+                        onQuantityChange = { saleQty = it.coerceIn(1, capturedItem.stock) },
+                        onConfirm = {
+                            val allItems = cartItems + CartItem(
+                                barcode = capturedItem.barcode,
+                                productName = capturedItem.name,
+                                quantity = saleQty,
+                                unitPrice = capturedItem.price,
+                                costPrice = capturedItem.costPrice
+                            )
+                            viewModel.processBulkSale(allItems, "", "Walk-in", PaymentType.CASH, false)
+                            cartItems = emptyList()
+                            currentItem = null
+                            isScanning = true
+                        },
+                        onCancel = {
+                            currentItem = null
+                            isScanning = true
+                        },
+                        onAddAnother = {
+                            cartItems = cartItems + CartItem(
+                                barcode = capturedItem.barcode,
+                                productName = capturedItem.name,
+                                quantity = saleQty,
+                                unitPrice = capturedItem.price,
+                                costPrice = capturedItem.costPrice
+                            )
+                            currentItem = null
+                            isScanning = true
+                            saleQty = 1
+                        }
+                    )
             } else if (lookupLoading) {
                 Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(16.dp))
                     Text("Looking up barcode online...", fontSize = 16.sp)
                 }
-            } else if (lookupResult != null) {
-                Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(56.dp), tint = Green700)
-                    Spacer(Modifier.height(12.dp))
-                    Text("Product Found Online", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Spacer(Modifier.height(16.dp))
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Blue50)) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(lookupResult!!.name.ifBlank { "Unknown Product" }, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            if (lookupResult!!.brand.isNotBlank()) {
-                                Spacer(Modifier.height(4.dp))
-                                Text("Brand: ${lookupResult!!.brand}", fontSize = 13.sp, color = Grey600)
+            } else if (capturedLookup != null) {
+                    Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                        Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(56.dp), tint = Green700)
+                        Spacer(Modifier.height(12.dp))
+                        Text("Product Found Online", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Spacer(Modifier.height(16.dp))
+                        Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Blue50)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(capturedLookup.name.ifBlank { "Unknown Product" }, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                if (capturedLookup.brand.isNotBlank()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("Brand: ${capturedLookup.brand}", fontSize = 13.sp, color = Grey600)
+                                }
+                                if (capturedLookup.category.isNotBlank()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("Category: ${capturedLookup.category}", fontSize = 13.sp, color = Grey600)
+                                }
+                                Text("Barcode: $missingBarcode", fontSize = 12.sp, color = Grey600)
                             }
-                            if (lookupResult!!.category.isNotBlank()) {
-                                Spacer(Modifier.height(4.dp))
-                                Text("Category: ${lookupResult!!.category}", fontSize = 13.sp, color = Grey600)
-                            }
-                            Text("Barcode: $missingBarcode", fontSize = 12.sp, color = Grey600)
+                        }
+                        Spacer(Modifier.height(20.dp))
+                        Button(onClick = { showAddFromLookup = true }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(10.dp)) {
+                            Icon(Icons.Filled.Add, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Add to Inventory")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(onClick = { missingBarcode = ""; lookupResult = null; isScanning = true }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(10.dp)) {
+                            Text("Scan Again")
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        TextButton(onClick = onBack) {
+                            Text("Go Back")
                         }
                     }
-                    Spacer(Modifier.height(20.dp))
-                    Button(onClick = { showAddFromLookup = true }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(10.dp)) {
-                        Icon(Icons.Filled.Add, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Add to Inventory")
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = { missingBarcode = ""; lookupResult = null; isScanning = true }, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(10.dp)) {
-                        Text("Scan Again")
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    TextButton(onClick = onBack) {
-                        Text("Go Back")
-                    }
-                }
             } else if (cameraError) {
                 Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     Icon(Icons.Filled.VideocamOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
@@ -396,11 +398,12 @@ fun ScanScreen(
         }
     }
 
-    if (error != null) {
+    val errMsg = error
+    if (errMsg != null) {
         AlertDialog(
             onDismissRequest = { viewModel.clearError() },
             title = { Text("Notice") },
-            text = { Text(error!!) },
+            text = { Text(errMsg) },
             confirmButton = {
                 TextButton(onClick = { viewModel.clearError() }) { Text("OK") }
             }
@@ -558,10 +561,10 @@ private fun SaleForm(
     val discountAmt = if (discount != null && discount.isActive) {
         when (discount.type) {
             DiscountType.PERCENTAGE -> overallSubtotal * discount.value / 100.0
-            DiscountType.FIXED_AMOUNT -> discount.value
+            DiscountType.FIXED_AMOUNT -> discount.value * totalQty
         }
     } else 0.0
-    val overallTotal = overallSubtotal - discountAmt
+    val overallTotal = maxOf(0.0, overallSubtotal - discountAmt)
     var showDiscountPicker by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
