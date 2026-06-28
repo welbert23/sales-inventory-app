@@ -231,6 +231,7 @@ fun SalesReportScreen(
                             IconButton(onClick = {
                                 reprintPrinters = BluetoothPrinter.getPairedPrinters()
                                 if (reprintPrinters.isNotEmpty()) showReprintPicker = true
+                                else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
                             }) {
                                 Icon(Icons.Filled.Print, contentDescription = "Reprint")
                             }

@@ -490,6 +490,7 @@ fun ScanScreen(
                     showPrintDialog = false
                     pairedPrinters = BluetoothPrinter.getPairedPrinters()
                     if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+                    else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
                 }) { Text("Print") }
             },
             dismissButton = {
