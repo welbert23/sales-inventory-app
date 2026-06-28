@@ -380,8 +380,9 @@ fun BulkCheckoutScreen(
                             selectedCustomerId to (c?.customerType ?: "Walk-in")
                         }
                     }
-                    viewModel.processBulkSale(cartItems, actualCustomerId, customerType, selectedPaymentType, isCredit)
-                    lastTransactionId = java.util.UUID.randomUUID().toString().take(8)
+                    val tid = java.util.UUID.randomUUID().toString()
+                    viewModel.processBulkSale(cartItems, actualCustomerId, customerType, selectedPaymentType, isCredit, tid)
+                    lastTransactionId = tid
                     cartItems = emptyList()
                     showPrintDialog = true
                 },

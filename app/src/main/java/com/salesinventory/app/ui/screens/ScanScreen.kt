@@ -40,6 +40,7 @@ import com.salesinventory.app.scanner.BarcodeAnalyzer
 import com.salesinventory.app.ui.theme.*
 import com.salesinventory.app.util.BarcodeProductInfo
 import com.salesinventory.app.util.lookupBarcode
+import com.salesinventory.app.util.BluetoothPrinter
 import com.salesinventory.app.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
@@ -70,6 +71,10 @@ fun ScanScreen(
     var lookupName by remember { mutableStateOf("") }
     var lookupCategory by remember { mutableStateOf("") }
     var lookupPrice by remember { mutableStateOf("") }
+    var lastTransactionId by remember { mutableStateOf("") }
+    var showPrintDialog by remember { mutableStateOf(false) }
+    var showPrinterPicker by remember { mutableStateOf(false) }
+    var pairedPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     val scope = rememberCoroutineScope()
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -282,10 +287,13 @@ fun ScanScreen(
                                 unitPrice = capturedItem.price,
                                 costPrice = capturedItem.costPrice
                             )
-                            viewModel.processBulkSale(allItems, "", "Walk-in", PaymentType.CASH, false)
+                            val tid = java.util.UUID.randomUUID().toString()
+                            viewModel.processBulkSale(allItems, "", "Walk-in", PaymentType.CASH, false, tid)
+                            lastTransactionId = tid
                             cartItems = emptyList()
                             currentItem = null
                             isScanning = true
+                            showPrintDialog = true
                         },
                         onCancel = {
                             currentItem = null
@@ -423,8 +431,9 @@ fun ScanScreen(
         )
     }
 
-    if (showAddFromLookup && lookupResult != null) {
-        val info = lookupResult!!
+    val lookupInfo = lookupResult
+    if (showAddFromLookup && lookupInfo != null) {
+        val info = lookupInfo
         LaunchedEffect(info) {
             lookupName = info.name
             lookupCategory = info.category
@@ -467,6 +476,52 @@ fun ScanScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showAddFromLookup = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showPrintDialog) {
+        AlertDialog(
+            onDismissRequest = { showPrintDialog = false },
+            title = { Text("Print Receipt?") },
+            text = { Text("Do you want to print a receipt for this transaction?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPrintDialog = false
+                    pairedPrinters = BluetoothPrinter.getPairedPrinters()
+                    if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+                }) { Text("Print") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPrintDialog = false }) { Text("No") }
+            }
+        )
+    }
+
+    if (showPrinterPicker && pairedPrinters.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { showPrinterPicker = false },
+            title = { Text("Select Printer") },
+            text = {
+                Column {
+                    pairedPrinters.forEach { (address, name) ->
+                        TextButton(
+                            onClick = {
+                                showPrinterPicker = false
+                                viewModel.printReceipt(lastTransactionId, address) { success ->
+                                    if (success) Toast.makeText(context, "Receipt printed", Toast.LENGTH_SHORT).show()
+                                    else Toast.makeText(context, "Print failed", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(name)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPrinterPicker = false }) { Text("Cancel") }
             }
         )
     }

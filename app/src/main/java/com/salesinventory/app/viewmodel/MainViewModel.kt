@@ -242,10 +242,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun processBulkSale(items: List<CartItem>, customerId: String = "", customerType: String = "", paymentType: PaymentType = PaymentType.CASH, isCredit: Boolean = false) {
+    fun processBulkSale(items: List<CartItem>, customerId: String = "", customerType: String = "", paymentType: PaymentType = PaymentType.CASH, isCredit: Boolean = false, transactionId: String = UUID.randomUUID().toString()) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val transactionId = UUID.randomUUID().toString()
                 val discount = _currentDiscount.value
                 for (cart in items) {
                     val item = appStorage.getItemByBarcode(cart.barcode)

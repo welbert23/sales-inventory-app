@@ -1,6 +1,7 @@
 package com.salesinventory.app.ui.screens
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,6 +27,7 @@ import com.salesinventory.app.data.ReportSettings
 import com.salesinventory.app.data.ReportSettingsManager
 import com.salesinventory.app.data.SaleRecord
 import com.salesinventory.app.ui.theme.*
+import com.salesinventory.app.util.BluetoothPrinter
 import com.salesinventory.app.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -70,6 +72,8 @@ fun SalesReportScreen(
     var showShareDialog by remember { mutableStateOf(false) }
     var shareText by remember { mutableStateOf("") }
     var selectedTransactionSales by remember { mutableStateOf<List<SaleRecord>?>(null) }
+    var showReprintPicker by remember { mutableStateOf(false) }
+    var reprintPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
 
     val reportText = remember(filteredSales, totalSales, totalItems, inventory, settings) {
         buildReportText(sales, filteredSales, totalSales, totalItems, inventory, settings)
@@ -223,8 +227,16 @@ fun SalesReportScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Receipt Preview", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        IconButton(onClick = { selectedTransactionSales = null }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Close")
+                        Row {
+                            IconButton(onClick = {
+                                reprintPrinters = BluetoothPrinter.getPairedPrinters()
+                                if (reprintPrinters.isNotEmpty()) showReprintPicker = true
+                            }) {
+                                Icon(Icons.Filled.Print, contentDescription = "Reprint")
+                            }
+                            IconButton(onClick = { selectedTransactionSales = null }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Close")
+                            }
                         }
                     }
                     Divider()
@@ -232,6 +244,35 @@ fun SalesReportScreen(
                 }
             }
         }
+    }
+
+    if (showReprintPicker && reprintPrinters.isNotEmpty()) {
+        val tid = selectedTransactionSales?.first()?.transactionId?.ifBlank { selectedTransactionSales?.first()?.id } ?: ""
+        AlertDialog(
+            onDismissRequest = { showReprintPicker = false },
+            title = { Text("Select Printer") },
+            text = {
+                Column {
+                    reprintPrinters.forEach { (address, name) ->
+                        TextButton(
+                            onClick = {
+                                showReprintPicker = false
+                                viewModel.printReceipt(tid, address) { success ->
+                                    if (success) Toast.makeText(context, "Receipt printed", Toast.LENGTH_SHORT).show()
+                                    else Toast.makeText(context, "Print failed", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(name)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showReprintPicker = false }) { Text("Cancel") }
+            }
+        )
     }
 
     if (showShareDialog) {
