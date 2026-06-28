@@ -141,7 +141,7 @@ fun HomeScreen(
                             modifier = Modifier.weight(1f),
                             title = "Sales Today",
                             value = "PHP ${"%.0f".format(todaySalesTotal)}",
-                            icon = Icons.Filled.TrendingUp,
+                            icon = Icons.Filled.ShoppingCart,
                             color = Color.White,
                             bgColor = Color.White.copy(alpha = 0.15f)
                         )
@@ -149,7 +149,7 @@ fun HomeScreen(
                             modifier = Modifier.weight(1f),
                             title = "Profit Today",
                             value = "PHP ${"%.0f".format(todayProfit)}",
-                            icon = Icons.Filled.AccountBalance,
+                            icon = Icons.Filled.Store,
                             color = Color.White,
                             bgColor = Color.White.copy(alpha = 0.15f)
                         )
