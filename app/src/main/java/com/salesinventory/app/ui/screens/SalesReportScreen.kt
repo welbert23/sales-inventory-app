@@ -1,7 +1,12 @@
 package com.salesinventory.app.ui.screens
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -74,6 +80,27 @@ fun SalesReportScreen(
     var selectedTransactionSales by remember { mutableStateOf<List<SaleRecord>?>(null) }
     var showReprintPicker by remember { mutableStateOf(false) }
     var reprintPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var hasBluetoothPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= 31) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                        PackageManager.PERMISSION_GRANTED
+            } else true
+        )
+    }
+
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasBluetoothPermission = granted
+        if (granted) {
+            reprintPrinters = BluetoothPrinter.getPairedPrinters()
+            if (reprintPrinters.isNotEmpty()) showReprintPicker = true
+            else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Bluetooth permission required for printing", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val reportText = remember(filteredSales, totalSales, totalItems, inventory, settings) {
         buildReportText(sales, filteredSales, totalSales, totalItems, inventory, settings)
@@ -229,9 +256,13 @@ fun SalesReportScreen(
                         Text("Receipt Preview", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Row {
                             IconButton(onClick = {
-                                reprintPrinters = BluetoothPrinter.getPairedPrinters()
-                                if (reprintPrinters.isNotEmpty()) showReprintPicker = true
-                                else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+                                if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
+                                    bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                                } else {
+                                    reprintPrinters = BluetoothPrinter.getPairedPrinters()
+                                    if (reprintPrinters.isNotEmpty()) showReprintPicker = true
+                                    else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+                                }
                             }) {
                                 Icon(Icons.Filled.Print, contentDescription = "Reprint")
                             }

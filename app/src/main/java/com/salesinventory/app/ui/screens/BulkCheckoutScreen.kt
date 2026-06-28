@@ -1,5 +1,10 @@
 package com.salesinventory.app.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.salesinventory.app.data.CartItem
 import com.salesinventory.app.data.DiscountType
 import com.salesinventory.app.data.InventoryItem
@@ -52,6 +58,27 @@ fun BulkCheckoutScreen(
     var showPrintDialog by remember { mutableStateOf(false) }
     var showPrinterPicker by remember { mutableStateOf(false) }
     var pairedPrinters by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var hasBluetoothPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= 31) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                        PackageManager.PERMISSION_GRANTED
+            } else true
+        )
+    }
+
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasBluetoothPermission = granted
+        if (granted) {
+            pairedPrinters = BluetoothPrinter.getPairedPrinters()
+            if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+            else localError = "No paired Bluetooth printers found"
+        } else {
+            localError = "Bluetooth permission required for printing"
+        }
+    }
 
     fun addToCart(barcode: String) {
         val trimmed = barcode.trim()
@@ -408,9 +435,13 @@ fun BulkCheckoutScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showPrintDialog = false
-                    pairedPrinters = BluetoothPrinter.getPairedPrinters()
-                    if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
-                    else localError = "No paired Bluetooth printers found"
+                    if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
+                        bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                    } else {
+                        pairedPrinters = BluetoothPrinter.getPairedPrinters()
+                        if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+                        else localError = "No paired Bluetooth printers found"
+                    }
                 }) { Text("Print") }
             },
             dismissButton = {

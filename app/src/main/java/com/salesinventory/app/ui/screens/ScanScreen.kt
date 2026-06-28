@@ -2,6 +2,7 @@ package com.salesinventory.app.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -82,16 +83,37 @@ fun ScanScreen(
                     PackageManager.PERMISSION_GRANTED
         )
     }
+    var hasBluetoothPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= 31) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                        PackageManager.PERMISSION_GRANTED
+            } else true
+        )
+    }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasCameraPermission = granted
     }
 
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasBluetoothPermission = granted
+        if (granted) {
+            pairedPrinters = BluetoothPrinter.getPairedPrinters()
+            if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+            else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Bluetooth permission required for printing", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -154,7 +176,7 @@ fun ScanScreen(
                     Spacer(Modifier.height(16.dp))
                     Text("Camera permission is required to scan barcodes", textAlign = TextAlign.Center)
                     Spacer(Modifier.height(16.dp))
-                    Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                    Button(onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }) {
                         Text("Grant Permission")
                     }
                 }
@@ -488,9 +510,13 @@ fun ScanScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showPrintDialog = false
-                    pairedPrinters = BluetoothPrinter.getPairedPrinters()
-                    if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
-                    else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+                    if (Build.VERSION.SDK_INT >= 31 && !hasBluetoothPermission) {
+                        bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                    } else {
+                        pairedPrinters = BluetoothPrinter.getPairedPrinters()
+                        if (pairedPrinters.isNotEmpty()) showPrinterPicker = true
+                        else Toast.makeText(context, "No paired Bluetooth printers found", Toast.LENGTH_SHORT).show()
+                    }
                 }) { Text("Print") }
             },
             dismissButton = {

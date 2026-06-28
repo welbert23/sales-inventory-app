@@ -29,10 +29,14 @@ object BluetoothPrinter {
     private fun cmdSetCharSize(w: Int, h: Int) = escp(GS, 0x21, ((w and 0x0F) or ((h and 0x0F) shl 4)))
 
     fun getPairedPrinters(): List<Pair<String, String>> {
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return emptyList()
-        return adapter.bondedDevices
-            .filter { it.type != BluetoothDevice.DEVICE_TYPE_LE }
-            .map { it.address to it.name }
+        return try {
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return emptyList()
+            adapter.bondedDevices
+                .filter { it.type != BluetoothDevice.DEVICE_TYPE_LE }
+                .map { it.address to it.name }
+        } catch (_: SecurityException) {
+            emptyList()
+        }
     }
 
     fun connect(address: String): Boolean {
@@ -46,6 +50,9 @@ object BluetoothPrinter {
             socket?.connect()
             outputStream = socket?.outputStream
             return outputStream != null
+        } catch (e: SecurityException) {
+            disconnect()
+            return false
         } catch (e: IOException) {
             disconnect()
             return false
